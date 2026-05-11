@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <title>POS Терминал - Бадминтон</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        /* 1. ГЛОБАЛНИ НАСТРОЙКИ ЗА APP УСЕЩАНЕ */
+        body {
+            background-color: #eef2f6;
+            height: 100vh; /* Цял екран */
+            overflow: hidden; /* Без скрол на цялата страница */
+            display: flex;
+            flex-direction: column;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* 2. ГОРНА ЛЕНТА (HEADER) */
+        .app-header {
+            background: #1e293b; /* Тъмно синьо-сиво */
+            color: white;
+            padding: 0 20px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+        }
+        .app-brand { font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; }
+        .cashier-info { background: #334155; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; }
+
+        /* 3. ОСНОВЕН КОНТЕЙНЕР */
+        .main-workspace {
+            flex-grow: 1;
+            padding: 15px;
+            display: flex;
+            gap: 15px; /* Разстояние между колоните */
+            overflow: hidden;
+        }
+
+        /* 4. КАРТИ / ПАНЕЛИ */
+        .panel {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+        }
+        .panel-header {
+            background: #f8fafc;
+            padding: 15px;
+            border-bottom: 1px solid #e2e8f0;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .panel-body {
+            flex-grow: 1;
+            overflow-y: auto; /* Скрол само вътре в панела */
+            padding: 10px;
+        }
+
+        /* 5. БУТОНИ ТИП "ПЛОЧКИ" (Services) */
+        .tile-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* 2 колони */
+            gap: 10px;
+        }
+        .btn-tile {
+            background: #fff;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 20px 10px;
+            text-align: center;
+            transition: all 0.2s;
+            color: #475569;
+        }
+        .btn-tile:hover {
+            border-color: #3b82f6;
+            background: #eff6ff;
+            transform: translateY(-2px);
+            color: #1d4ed8;
+        }
+        .btn-tile i { font-size: 24px; margin-bottom: 8px; display: block; }
+        .btn-tile small { display: block; font-weight: bold; margin-top: 5px; color: #10b981; }
+
+        /* 6. ТАБЛИЦИ */
+        .table-custom thead th {
+            background: #f1f5f9;
+            color: #64748b;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .product-row { cursor: default; }
+        .price-tag { font-family: 'Consolas', monospace; font-weight: bold; color: #334155; }
+        
+        /* 7. ТЪРСАЧКА */
+        .search-container { position: relative; margin-bottom: 15px; }
+        .search-container input {
+            padding-left: 35px;
+            border-radius: 20px;
+            background: #f1f5f9;
+            border: none;
+        }
+        .search-container i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #94a3b8;
+        }
+
+        /* Скролбар дизайн */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body>
+
+<header class="app-header">
+    <div class="d-flex align-items-center">
+        <i class="fas fa-shuttlecock fa-lg me-2 text-warning"></i>
+        <span class="app-brand">BADMINTON POS</span>
+    </div>
+    
+    <div class="d-flex align-items-center gap-3">
+        <div class="cashier-info">
+            <i class="fas fa-user-circle me-1"></i> {{ user.get_full_name|default:user.username }}
+        </div>
+        <a href="{% url 'home' %}" class="btn btn-outline-light btn-sm rounded-pill px-3">
+            <i class="fas fa-sign-out-alt"></i> Изход
+        </a>
+    </div>
+</header>
+
+<div style="position: absolute; top: 70px; left: 50%; transform: translateX(-50%); z-index: 1000; width: 60%;">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} shadow-sm py-2 text-center mb-1 alert-dismissible fade show">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+</div>
+
+<div class="main-workspace">
+
+    <div class="panel" style="flex: 0 0 20%;">
+        <div class="panel-header">
+            <i class="fas fa-concierge-bell me-2"></i> Услуги
+        </div>
+        <div class="panel-body">
+            <div class="tile-grid">
+                <button class="btn-tile">
+                    <i class="fas fa-ruler-combined"></i>
+                    Наем Ракета
+                    <small>5.00 лв.</small>
+                </button>
+                <button class="btn-tile">
+                    <i class="fas fa-shoe-prints"></i>
+                    Наем Обувки
+                    <small>3.00 лв.</small>
+                </button>
+                <button class="btn-tile">
+                    <i class="fas fa-wrench"></i>
+                    Наплитане
+                    <small>15.00 лв.</small>
+                </button>
+                <button class="btn-tile">
+                    <i class="fas fa-coffee"></i>
+                    Кафе
+                    <small>1.50 лв.</small>
+                </button>
+                <button class="btn-tile">
+                    <i class="fas fa-tint"></i>
+                    Вода
+                    <small>2.00 лв.</small>
+                </button>
+                <button class="btn-tile">
+                    <i class="fas fa-tshirt"></i>
+                    Екип
+                    <small>5.00 лв.</small>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel" style="flex: 0 0 35%;">
+        <div class="panel-header">
+            <i class="fas fa-box-open me-2"></i> Склад / Продукти
+        </div>
+        <div class="panel-body p-0"> <table class="table table-hover table-custom mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th class="ps-3">Продукт</th>
+                        <th class="text-center">Нал.</th>
+                        <th>Цена</th>
+                        <th class="text-end pe-3">Действие</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr class="product-row">
+                        <td class="ps-3 fw-bold text-dark">{{ product.name }}</td>
+                        <td class="text-center">
+                            {% if product.quantity < 5 %}
+                                <span class="badge bg-danger rounded-pill">{{ product.quantity }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary rounded-pill bg-opacity-25 text-dark">{{ product.quantity }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="price-tag">{{ product.price }} лв.</td>
+                        <td class="text-end pe-3">
+                            {% if product.quantity > 0 %}
+                                <form action="{% url 'sell_product' product.id %}" method="post">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-primary rounded-circle" title="Продай 1 бр.">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </form>
+                            {% else %}
+                                <button class="btn btn-sm btn-light rounded-circle text-muted" disabled>
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4" class="text-center py-4 text-muted">Няма продукти</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel" style="flex-grow: 1;">
+        <div class="panel-header bg-white">
+            <div class="d-flex align-items-center">
+                <i class="far fa-calendar-alt me-2 text-primary"></i> 
+                <span class="text-dark">{{ selected_date|date:"d.m.Y" }}</span>
+            </div>
+            <div>
+                <a href="?date={{ prev_day }}" class="btn btn-sm btn-outline-secondary px-3"><i class="fas fa-chevron-left"></i></a>
+                <a href="?date={{ next_day }}" class="btn btn-sm btn-outline-secondary px-3"><i class="fas fa-chevron-right"></i></a>
+            </div>
+        </div>
+
+        <div class="panel-body">
+            
+            <form method="get" class="search-container">
+                <i class="fas fa-search"></i>
+                <input type="text" name="q" class="form-control" placeholder="Търсене на клиент (Име, Телефон)..." value="{{ search_query|default:'' }}" autocomplete="off">
+            </form>
+
+            {% if found_users %}
+                <div class="card border-warning mb-3 shadow-sm">
+                    <div class="card-header bg-warning bg-opacity-10 text-warning-emphasis fw-bold">
+                        <i class="fas fa-user-check me-1"></i> Намерени клиенти:
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        {% for u in found_users %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-bold">{{ u.get_full_name }}</div>
+                                <small class="text-muted"><i class="fas fa-phone-alt fa-xs me-1"></i> {{ u.phone|default:"-" }}</small>
+                            </div>
+                            <button class="btn btn-sm btn-dark rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#bookModal{{ u.id }}">
+                                + Резервирай
+                            </button>
+                        </li>
+
+                        <div class="modal fade" id="bookModal{{ u.id }}" tabindex="-1">
+                            <div class="modal-dialog modal-sm">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-dark text-white">
+                                        <h6 class="modal-title">Нов час: {{ u.get_full_name }}</h6>
+                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <form action="{% url 'make_booking' %}" method="post">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}">
+                                            <div class="mb-2">
+                                                <label class="small text-muted">Корт</label>
+                                                <select name="court_id" class="form-select">
+                                                    {% for c in courts %}
+                                                        <option value="{{ c.id }}">{{ c.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="small text-muted">Час</label>
+                                                <select name="hour" class="form-select">
+                                                    {% for h in "8,9,10,11,12,13,14,15,16,17,18,19,20,21"|make_list %}
+                                                        <option value="{{ h }}">{{ h }}:00</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary w-100">Запази</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <small class="text-uppercase text-muted fw-bold">График за деня</small>
+                <span class="badge bg-light text-dark border">{{ bookings.count }} резервации</span>
+            </div>
+
+            <div class="list-group">
+                {% for b in bookings %}
+                <div class="list-group-item border-0 shadow-sm mb-2 rounded p-3 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <div class="bg-light rounded p-2 text-center me-3" style="min-width: 60px;">
+                            <div class="fw-bold h5 mb-0">{{ b.start_time|date:"H:i" }}</div>
+                        </div>
+                        <div>
+                            <div class="fw-bold text-dark">{{ b.court.name }}</div>
+                            <div class="small text-muted">
+                                <i class="far fa-user me-1"></i> {{ b.customer.get_full_name }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-end">
+                        {% if b.payment_status == 'not_paid' %}
+                            <a href="{% url 'mark_paid' b.id %}" class="btn btn-outline-success btn-sm rounded-pill px-3 fw-bold mb-1 d-block">
+                                <i class="fas fa-money-bill-wave me-1"></i> ПЛАТИ
+                            </a>
+                        {% else %}
+                            <div class="badge bg-success bg-opacity-25 text-success rounded-pill px-3 py-2 mb-1 d-block">
+                                <i class="fas fa-check me-1"></i> ПЛАТЕНО
+                            </div>
+                        {% endif %}
+                        
+                        <a href="{% url 'cancel_booking' b.id %}" class="text-danger small text-decoration-none" onclick="return confirm('Изтриване?')">
+                            Отказ
+                        </a>
+                    </div>
+                </div>
+                {% empty %}
+                    <div class="text-center py-5 text-muted bg-light rounded border border-dashed">
+                        <i class="far fa-calendar-times fa-2x mb-2"></i><br>
+                        Няма резервации за този ден.
+                    </div>
+                {% endfor %}
+            </div>
+            
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

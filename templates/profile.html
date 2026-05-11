@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <title>Моят Профил</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-dark bg-dark mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="{% url 'home' %}">🏠 Начало</a>
+        
+        <div class="d-flex align-items-center">
+            <a href="{% url 'profile' %}" class="text-warning text-decoration-none fw-bold me-3">
+                👤 {{ user.get_full_name|default:user.username }}
+            </a>
+
+            <a href="{% url 'schedule' %}" class="btn btn-warning btn-sm me-2">📅 Нов час</a>
+            
+            <form action="{% url 'logout' %}" method="post" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-light btn-sm">Изход</button>
+            </form>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="m-0">👤 Моите данни</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Име:</strong> {{ user.get_full_name }}</p>
+                    <p><strong>Потребител:</strong> {{ user.username }}</p>
+                    <p><strong>Имейл:</strong> {{ user.email }}</p>
+                    <p><strong>Телефон:</strong> {{ user.phone }}</p>
+                    <hr>
+                    <p><strong>Роля:</strong> {{ user.get_role_display }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <h5 class="m-0">🏸 Моите Резервации</h5>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0 text-center align-middle">
+                        <thead class="table-secondary">
+                            <tr>
+                                <th>Дата</th>
+                                <th>Час</th>
+                                <th>Корт</th>
+                                <th>Статус</th>
+                                <th>Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for booking in bookings %}
+                            <tr>
+                                <td>{{ booking.start_time|date:"d.m.Y" }}</td>
+                                <td class="fw-bold">{{ booking.start_time|date:"H:i" }}</td>
+                                <td>{{ booking.court.name }}</td>
+                                <td>
+                                    {% if booking.start_time < now %}
+                                        <span class="badge bg-secondary">Минала</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Активна</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if booking.start_time > now %}
+                                        <a href="{% url 'cancel_booking' booking.id %}" 
+                                           class="btn btn-danger btn-sm"
+                                           onclick="return confirm('Сигурни ли сте, че искате да откажете часа?')">
+                                            ❌ Откажи
+                                        </a>
+                                    {% else %}
+                                        ---
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="py-4 text-muted">
+                                    Нямате записани часове. <a href="{% url 'schedule' %}">Запазете сега!</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>
