@@ -1,0 +1,12 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+db.sqlite3
+media
+postgres_data
+mysql_data.json

@@ -17,6 +17,7 @@ urlpatterns = [
 
     # --- ГРАФИК И РЕЗЕРВАЦИИ ---
     path('schedule/', views.schedule, name='schedule'),
+    path('booking/login-required/', views.booking_login_required, name='booking_login_required'),
     path('booking/make/', views.make_booking, name='make_booking'),
     path('booking/cancel/<int:booking_id>/', views.cancel_booking, name='cancel_booking'),
     path('booking/pay/<int:booking_id>/', views.mark_paid, name='mark_paid'),

@@ -25,6 +25,12 @@
                 {% endfor %}
             {% endif %}
 
+            {% if request.GET.next %}
+                <div class="alert alert-info">
+                    Нямате профил? <a href="{% url 'register' %}" class="alert-link">Направете регистрация тук</a>, след което ще можете да запазите час.
+                </div>
+            {% endif %}
+
             <div class="card shadow">
                 <div class="card-header bg-success text-white text-center">
                     <h3>🔐 Вход</h3>

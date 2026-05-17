@@ -6,6 +6,27 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from datetime import datetime, timedelta, time
 from django.db.models import Q
+from django.urls import reverse
+from urllib.parse import quote
+from zoneinfo import ZoneInfo
+
+BOOKING_GRACE_PERIOD = timedelta(minutes=30)
+BOOKING_TIME_ZONE = ZoneInfo('Europe/Sofia')
+
+
+def get_slot_start(selected_date, hour):
+    slot_start = datetime.combine(selected_date, time(hour, 0))
+    return timezone.make_aware(slot_start, timezone.get_current_timezone())
+
+
+def is_slot_bookable(selected_date, hour):
+    local_slot_start = datetime.combine(
+        selected_date,
+        time(hour, 0),
+        tzinfo=BOOKING_TIME_ZONE,
+    )
+    return datetime.now(BOOKING_TIME_ZONE) < local_slot_start + BOOKING_GRACE_PERIOD
+
 
 # --- 1. НАЧАЛНА СТРАНИЦА ---
 def home(request):
@@ -28,7 +49,6 @@ def register(request):
     return render(request, 'register.html', {'form': form})
 
 # --- 3. ГРАФИК (За Клиенти) ---
-@login_required
 def schedule(request):
     date_str = request.GET.get('date')
     if date_str:
@@ -58,6 +78,7 @@ def schedule(request):
             slots.append({
                 'court': court,
                 'is_taken': is_taken,
+                'is_bookable': is_slot_bookable(selected_date, hour),
                 'booking': booking_info,
                 'hour': hour
             })
@@ -70,12 +91,22 @@ def schedule(request):
         'courts': courts,
         'next_day': str(selected_date + timedelta(days=1)),
         'prev_day': str(selected_date - timedelta(days=1)),
+        'can_view_customer_names': (
+            request.user.is_authenticated
+            and request.user.role in ['admin', 'employee']
+        ),
     }
     return render(request, 'schedule.html', context)
 
 # --- 4. ЗАПАЗВАНЕ НА ЧАС ---
-@login_required
 def make_booking(request):
+    if not request.user.is_authenticated:
+        messages.warning(
+            request,
+            'Моля, влезте първо в акаунта си, за да запазите час!'
+        )
+        return redirect(f"{reverse('login')}?next={reverse('schedule')}")
+
     if request.method == 'POST':
         date_str = request.POST.get('date')
         hour = int(request.POST.get('hour'))
@@ -83,8 +114,12 @@ def make_booking(request):
         
         court = Court.objects.get(id=court_id)
         date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
-        start_time = datetime.combine(date_obj, time(hour, 0))
+        start_time = get_slot_start(date_obj, hour)
         end_time = start_time + timedelta(hours=1)
+
+        if not is_slot_bookable(date_obj, hour):
+            messages.error(request, 'Този час вече е изминал и не може да бъде запазен.')
+            return redirect(request.META.get('HTTP_REFERER', 'schedule'))
         
         # Резервацията се прави от името на текущия потребител (дори да е рецепционист)
         # В бъдеще може да добавим поле "client_name" за рецепцията.
@@ -105,6 +140,15 @@ def make_booking(request):
         # Връщаме се там, откъдето сме дошли (или в графика, или в рецепцията)
         return redirect(request.META.get('HTTP_REFERER', 'schedule'))
     return redirect('schedule')
+
+
+def booking_login_required(request):
+    messages.warning(
+        request,
+        'Моля, влезте първо в акаунта си, за да запазите час!'
+    )
+    next_url = request.GET.get('next') or reverse('schedule')
+    return redirect(f"{reverse('login')}?next={quote(next_url, safe='/')}")
 
 # --- 5. ПРОФИЛ ---
 @login_required

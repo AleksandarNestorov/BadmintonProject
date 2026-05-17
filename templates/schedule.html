@@ -19,6 +19,18 @@
             font-weight: bold;
             border: 2px solid #ffca2c;
         }
+        .slot-disabled {
+            min-height: 40px;
+            background-color: #f1f3f5;
+            border-radius: 4px;
+            opacity: 0.65;
+            color: #6c757d;
+            cursor: not-allowed;
+        }
+        .slot-taken-disabled {
+            background-color: #dee2e6 !important;
+            color: #6c757d !important;
+        }
         /* Фиксиран панел долу */
         .bottom-action-bar {
             position: fixed;
@@ -39,10 +51,17 @@
 <nav class="navbar navbar-dark bg-dark mb-4">
     <div class="container">
         <a class="navbar-brand" href="{% url 'home' %}">🏠 Начало</a>
-        
-        <a href="{% url 'profile' %}" class="text-warning text-decoration-none fw-bold">
-            👤 Здравей, {{ user.get_full_name|default:user.username }}
-        </a>
+
+        {% if user.is_authenticated %}
+            <a href="{% url 'profile' %}" class="text-warning text-decoration-none fw-bold">
+                👤 Здравей, {{ user.get_full_name|default:user.username }}
+            </a>
+        {% else %}
+            <div>
+                <a href="{% url 'login' %}?next={% url 'schedule' %}" class="btn btn-outline-light btn-sm me-2">Вход</a>
+                <a href="{% url 'register' %}" class="btn btn-warning btn-sm">Регистрация</a>
+            </div>
+        {% endif %}
     </div>
 </nav>
 
@@ -82,11 +101,15 @@
                         {% for slot in row.slots %}
                             <td>
                                 {% if slot.is_taken %}
-                                    <div class="badge bg-danger p-2 w-100">
+                                    <div class="badge {% if not slot.is_bookable %}slot-taken-disabled{% else %}bg-danger{% endif %} p-2 w-100">
                                         ⛔ Заето
-                                        {% if user.role == 'admin' or user.role == 'employee' %}
+                                        {% if can_view_customer_names %}
                                             <br><small>({{ slot.booking.customer.get_full_name }})</small>
                                         {% endif %}
+                                    </div>
+                                {% elif not slot.is_bookable %}
+                                    <div class="p-2 w-100 slot-disabled">
+                                        ✅ Свободно
                                     </div>
                                 {% else %}
                                     <div class="p-2 w-100 slot-cell" 
@@ -115,16 +138,22 @@
                 ❌ Премахни избора
             </button>
             
-            <form action="{% url 'make_booking' %}" method="post" class="d-inline">
-                {% csrf_token %}
-                <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}">
-                <input type="hidden" name="court_id" id="inputCourtId">
-                <input type="hidden" name="hour" id="inputHour">
-                
-                <button type="submit" class="btn btn-success btn-lg fw-bold">
-                    💾 Запази моят избор
-                </button>
-            </form>
+            {% if user.is_authenticated %}
+                <form action="{% url 'make_booking' %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}">
+                    <input type="hidden" name="court_id" id="inputCourtId">
+                    <input type="hidden" name="hour" id="inputHour">
+
+                    <button type="submit" class="btn btn-success btn-lg fw-bold">
+                        💾 Запази моят избор
+                    </button>
+                </form>
+            {% else %}
+                <a href="{% url 'booking_login_required' %}?next={{ request.get_full_path|urlencode }}" class="btn btn-success btn-lg fw-bold">
+                    💾 Влез, за да запазиш
+                </a>
+            {% endif %}
         </div>
     </div>
 </div>

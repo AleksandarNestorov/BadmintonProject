@@ -54,6 +54,40 @@
     inputs.forEach(function(input) {
         input.classList.add('form-control');
     });
+
+    var selects = document.querySelectorAll('select');
+    selects.forEach(function(select) {
+        select.classList.add('form-select');
+    });
+
+    var countrySelect = document.getElementById('id_phone_country');
+    var phoneInput = document.getElementById('id_phone');
+
+    if (countrySelect && phoneInput) {
+        var rules = {};
+        countrySelect.dataset.phoneRules.split('|').forEach(function(item) {
+            var parts = item.split(':');
+            rules[parts[0]] = {
+                prefix: parts[1],
+                digits: parts[2],
+                example: parts[3]
+            };
+        });
+
+        function updatePhoneHint() {
+            var rule = rules[countrySelect.value];
+            if (!rule) return;
+            phoneInput.placeholder = rule.example;
+
+            var helpText = phoneInput.closest('.mb-3').querySelector('.form-text');
+            if (helpText) {
+                helpText.textContent = 'Въведете ' + rule.digits + ' цифри след ' + rule.prefix + ', например ' + rule.example + '.';
+            }
+        }
+
+        countrySelect.addEventListener('change', updatePhoneHint);
+        updatePhoneHint();
+    }
 </script>
 
 </body>
