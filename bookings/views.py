@@ -5,7 +5,8 @@ from .forms import UserRegisterForm
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from datetime import datetime, timedelta, time
-from django.db.models import Q
+from django.db.models import Q, Value
+from django.db.models.functions import Concat
 from django.urls import reverse
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
@@ -30,7 +31,7 @@ def is_slot_bookable(selected_date, hour):
 
 # --- 1. НАЧАЛНА СТРАНИЦА ---
 def home(request):
-    products = Product.objects.all()
+    products = Product.objects.exclude(name__iexact='Минерална вода')
     trainers = TrainerProfile.objects.all()
     context = {'products': products, 'trainers': trainers}
     return render(request, 'home.html', context)
@@ -121,8 +122,15 @@ def make_booking(request):
             messages.error(request, 'Този час вече е изминал и не може да бъде запазен.')
             return redirect(request.META.get('HTTP_REFERER', 'schedule'))
         
-        # Резервацията се прави от името на текущия потребител (дори да е рецепционист)
-        # В бъдеще може да добавим поле "client_name" за рецепцията.
+        customer = request.user
+        customer_id = request.POST.get('customer_id')
+        if customer_id:
+            if request.user.is_superuser or request.user.role in ['admin', 'employee']:
+                customer = get_object_or_404(User, id=customer_id)
+            else:
+                messages.error(request, 'Нямате права да запазвате час за друг клиент.')
+                return redirect(request.META.get('HTTP_REFERER', 'schedule'))
+
         exists = Booking.objects.filter(court=court, start_time=start_time, is_active=True).exists()
         
         if exists:
@@ -130,12 +138,12 @@ def make_booking(request):
         else:
             Booking.objects.create(
                 court=court,
-                customer=request.user,
+                customer=customer,
                 start_time=start_time,
                 end_time=end_time,
                 payment_status='not_paid'
             )
-            messages.success(request, 'Успешно запазихте час!')
+            messages.success(request, f'Успешно запазихте час за {customer.get_full_name() or customer.username}!')
             
         # Връщаме се там, откъдето сме дошли (или в графика, или в рецепцията)
         return redirect(request.META.get('HTTP_REFERER', 'schedule'))
@@ -187,29 +195,60 @@ def reception(request):
         selected_date = timezone.now().date()
 
     products = Product.objects.all()
+    service_products = products.filter(category__in=['service', 'equipment'])
+    courts = Court.objects.filter(is_active=True)
+    hours_range = range(8, 22)
     
     daily_bookings = Booking.objects.filter(
         start_time__date=selected_date, 
         is_active=True
     ).order_by('start_time')
 
+    schedule_data = []
+    for hour in hours_range:
+        row = {'hour': f"{hour}:00"}
+        slots = []
+        for court in courts:
+            booking_info = None
+            for booking in daily_bookings:
+                if booking.court == court and booking.start_time.hour == hour:
+                    booking_info = booking
+                    break
+            slots.append({
+                'court': court,
+                'hour': hour,
+                'is_taken': booking_info is not None,
+                'is_bookable': is_slot_bookable(selected_date, hour),
+                'booking': booking_info,
+            })
+        row['slots'] = slots
+        schedule_data.append(row)
+
     search_query = request.GET.get('q')
     found_users = None
     if search_query:
-        found_users = User.objects.filter(
+        found_users = User.objects.annotate(
+            full_name=Concat('first_name', Value(' '), 'last_name')
+        ).filter(
+            is_active=True
+        ).filter(
             Q(username__icontains=search_query) | 
             Q(first_name__icontains=search_query) |
             Q(last_name__icontains=search_query) |
+            Q(full_name__icontains=search_query) |
             Q(phone__icontains=search_query)
         )
 
     context = {
         'selected_date': selected_date,
         'products': products,
+        'service_products': service_products,
         'bookings': daily_bookings,
+        'schedule_data': schedule_data,
         'found_users': found_users,
         'search_query': search_query,
-        'courts': Court.objects.filter(is_active=True),
+        'courts': courts,
+        'hours_range': hours_range,
         'next_day': str(selected_date + timedelta(days=1)),
         'prev_day': str(selected_date - timedelta(days=1)),
     }
