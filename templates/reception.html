@@ -89,26 +89,18 @@
             min-width: 0;
         }
         .service-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-            gap: 14px;
-        }
-        .service-card {
-            background: #fff;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 18px;
-            box-shadow: 0 4px 10px rgba(15, 23, 42, 0.06);
-        }
-        .service-card i {
-            color: #32a6b8;
-            font-size: 1.35rem;
-            margin-bottom: 10px;
+            display: block;
         }
         .service-name {
             color: #1e293b;
             font-weight: 800;
-            margin-bottom: 6px;
+            line-height: 1.2;
+        }
+        .service-description {
+            color: #64748b;
+            font-size: 0.82rem;
+            font-weight: 500;
+            margin-top: 3px;
         }
         .service-price {
             color: #10b981;
@@ -201,6 +193,18 @@
             z-index: 10;
         }
         .product-row { cursor: default; }
+        .product-name {
+            color: #111827;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+        .product-description {
+            color: #64748b;
+            font-size: 0.8rem;
+            font-weight: 500;
+            line-height: 1.25;
+            margin-top: 3px;
+        }
         .price-tag { font-family: 'Consolas', monospace; font-weight: bold; color: #334155; }
         .inventory-toolbar {
             background: #343a40;
@@ -220,8 +224,17 @@
             font-weight: 700;
             padding-left: 38px;
         }
+        .inventory-search input:focus {
+            background: #fff;
+            color: #1e293b;
+            box-shadow: 0 0 0 3px rgba(50, 166, 184, 0.28);
+            padding-left: 38px;
+        }
         .inventory-search input::placeholder {
             color: rgba(255,255,255,0.78);
+        }
+        .inventory-search input:focus::placeholder {
+            color: #94a3b8;
         }
         .inventory-search i {
             position: absolute;
@@ -229,6 +242,11 @@
             top: 50%;
             transform: translateY(-50%);
             color: rgba(255,255,255,0.9);
+            pointer-events: none;
+            z-index: 2;
+        }
+        .inventory-search:focus-within i {
+            color: #32a6b8;
         }
         .toolbar-filter {
             background: #444b55;
@@ -237,6 +255,33 @@
             font-size: 0.85rem;
             font-weight: 700;
             min-width: 135px;
+        }
+        .sort-dropdown .dropdown-toggle {
+            background: #444b55;
+            color: #fff;
+            border: 0;
+            font-size: 0.85rem;
+            font-weight: 800;
+            min-width: 130px;
+        }
+        .sort-dropdown .dropdown-menu {
+            border: 0;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
+            font-size: 0.9rem;
+        }
+        .sort-dropdown .dropdown-item.active {
+            background: #32a6b8;
+            color: #fff;
+            font-weight: 800;
+        }
+        .product-counter {
+            background: #f8fafc;
+            color: #334155;
+            border-radius: 999px;
+            padding: 8px 13px;
+            font-size: 0.8rem;
+            font-weight: 800;
+            white-space: nowrap;
         }
         .toolbar-view-btn {
             background: #32a6b8;
@@ -330,7 +375,7 @@
         <i class="fas fa-store"></i> Продукти
     </button>
     <button type="button" class="pos-tab" data-tab="visits">
-        <i class="fas fa-person-running"></i> Посещения
+        <i class="fas fa-clipboard-list"></i> Услуги
     </button>
     <button type="button" class="pos-tab" data-tab="schedule">
         <i class="far fa-calendar-alt"></i> График
@@ -358,13 +403,27 @@
             <div class="inventory-toolbar">
                 <div class="inventory-search">
                     <i class="fas fa-search"></i>
-                    <input type="text" class="form-control" placeholder="Всички налични продукти от базата" disabled>
+                    <input type="text" id="productSearch" class="form-control" placeholder="Търси по име, марка, тип или пояснение..." autocomplete="off">
                 </div>
-                <select class="form-select toolbar-filter" disabled>
-                    <option>Склад</option>
-                </select>
-                <button type="button" class="btn toolbar-view-btn" disabled><i class="fas fa-list"></i></button>
-                <button type="button" class="btn toolbar-view-btn" disabled><i class="fas fa-table-cells"></i></button>
+                <div class="dropdown sort-dropdown product-sort-dropdown">
+                    <button class="btn dropdown-toggle" type="button" id="productSortButton" data-bs-toggle="dropdown" aria-expanded="false">
+                        SORT: Всички
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="productSortButton">
+                        <li><button class="dropdown-item active" type="button" data-filter="all">Всички продукти</button></li>
+                        <li><button class="dropdown-item" type="button" data-filter="drink">Само напитки/храни</button></li>
+                        <li><button class="dropdown-item" type="button" data-filter="product">Само стоки</button></li>
+                        <li><button class="dropdown-item" type="button" data-filter="low">Ниска наличност</button></li>
+                        <li><button class="dropdown-item" type="button" data-filter="untracked">Без склад</button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button class="dropdown-item" type="button" data-sort="name-asc">Име А-Я</button></li>
+                        <li><button class="dropdown-item" type="button" data-sort="price-asc">Цена ниска-висока</button></li>
+                        <li><button class="dropdown-item" type="button" data-sort="price-desc">Цена висока-ниска</button></li>
+                        <li><button class="dropdown-item" type="button" data-sort="quantity-asc">Количество ниско-високо</button></li>
+                    </ul>
+                </div>
+                <span class="product-counter" id="productResultCount">{{ products|length }} продукта</span>
+                <button type="button" class="btn toolbar-view-btn" id="clearProductSearch" title="Изчисти търсенето"><i class="fas fa-xmark"></i></button>
             </div>
             <div class="panel-body p-0">
                 <table class="table table-hover table-custom mb-0 align-middle">
@@ -379,11 +438,18 @@
                     </thead>
                     <tbody>
                         {% for product in products %}
-                        <tr class="product-row">
-                            <td class="ps-3 fw-bold text-dark">{{ product.name }}</td>
-                            <td class="text-muted">{{ product.category }}</td>
+                        <tr class="product-row" data-index="{{ forloop.counter0 }}" data-category="{{ product.category }}" data-stock="{% if product.quantity is None %}untracked{% elif product.quantity < 5 %}low{% else %}available{% endif %}" data-name="{{ product.name|lower }}" data-price="{{ product.price }}" data-quantity="{% if product.quantity is None %}-1{% else %}{{ product.quantity }}{% endif %}">
+                            <td class="ps-3">
+                                <div class="product-name">{{ product.name }}</div>
+                                {% if product.description %}
+                                    <div class="product-description">{{ product.description }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted">{{ product.get_category_display }}</td>
                             <td class="text-center">
-                                {% if product.quantity < 5 %}
+                                {% if product.quantity is None %}
+                                    <span class="badge bg-info rounded-pill">без склад</span>
+                                {% elif product.quantity < 5 %}
                                     <span class="badge bg-danger rounded-pill">{{ product.quantity }}</span>
                                 {% else %}
                                     <span class="badge bg-secondary rounded-pill bg-opacity-25 text-dark">{{ product.quantity }}</span>
@@ -391,7 +457,7 @@
                             </td>
                             <td class="price-tag">{{ product.price }} €</td>
                             <td class="text-end pe-3">
-                                {% if product.quantity > 0 %}
+                                {% if product.quantity is None or product.quantity > 0 %}
                                     <form action="{% url 'sell_product' product.id %}" method="post">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-sm btn-primary rounded-circle" title="Продай 1 бр.">
@@ -408,6 +474,11 @@
                         {% empty %}
                         <tr><td colspan="5" class="text-center py-4 text-muted">Няма продукти</td></tr>
                         {% endfor %}
+                        <tr id="noProductResults" class="d-none">
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                Няма намерени продукти по това търсене.
+                            </td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -417,20 +488,72 @@
     <div class="pos-tab-pane" id="tab-visits">
         <div class="panel w-100">
             <div class="panel-header">
-                <i class="fas fa-person-running me-2"></i> Посещения и услуги
+                <i class="fas fa-clipboard-list me-2"></i> Услуги
             </div>
-            <div class="panel-body">
-                <div class="service-grid">
-                    {% for service in service_products %}
-                    <div class="service-card">
-                        <i class="fas fa-circle-check"></i>
-                        <div class="service-name">{{ service.name }}</div>
-                        <div class="service-price">{{ service.price }} €</div>
-                    </div>
-                    {% empty %}
-                    <div class="text-muted">Няма добавени услуги.</div>
-                    {% endfor %}
+            <div class="inventory-toolbar">
+                <div class="inventory-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="serviceSearch" class="form-control" placeholder="Търси услуга, тренировка, наем или треньор..." autocomplete="off">
                 </div>
+                <div class="dropdown sort-dropdown service-sort-dropdown">
+                    <button class="btn dropdown-toggle" type="button" id="serviceSortButton" data-bs-toggle="dropdown" aria-expanded="false">
+                        SORT: Всички
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="serviceSortButton">
+                        <li><button class="dropdown-item active" type="button" data-filter="all">Всички услуги</button></li>
+                        <li><button class="dropdown-item" type="button" data-filter="game">Само игра</button></li>
+                        <li><button class="dropdown-item" type="button" data-filter="rental">Само наем</button></li>
+                        <li><button class="dropdown-item" type="button" data-filter="stringing">Само наплитане</button></li>
+                        <li><button class="dropdown-item" type="button" data-filter="training">Само тренировки</button></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><button class="dropdown-item" type="button" data-sort="name-asc">Име А-Я</button></li>
+                        <li><button class="dropdown-item" type="button" data-sort="price-asc">Цена ниска-висока</button></li>
+                        <li><button class="dropdown-item" type="button" data-sort="price-desc">Цена висока-ниска</button></li>
+                    </ul>
+                </div>
+                <span class="product-counter" id="serviceResultCount">{{ service_products|length }} услуги</span>
+                <button type="button" class="btn toolbar-view-btn" id="clearServiceSearch" title="Изчисти търсенето"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div class="panel-body p-0">
+                <table class="table table-hover table-custom mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th class="ps-3">Услуга</th>
+                            <th>Тип</th>
+                            <th>Цена</th>
+                            <th class="text-end pe-3">Действие</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for service in service_products %}
+                        <tr class="service-row" data-index="{{ forloop.counter0 }}" data-category="{{ service.category }}" data-name="{{ service.name|lower }}" data-price="{{ service.price }}">
+                            <td class="ps-3">
+                                <div class="service-name">{{ service.name }}</div>
+                                {% if service.description %}
+                                    <div class="service-description">{{ service.description }}</div>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted">{{ service.get_category_display }}</td>
+                            <td class="service-price">{{ service.price }} €</td>
+                            <td class="text-end pe-3">
+                                <form action="{% url 'sell_product' service.id %}" method="post">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-primary rounded-circle" title="Добави услуга">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center py-4 text-muted">Няма добавени услуги.</td></tr>
+                        {% endfor %}
+                        <tr id="noServiceResults" class="d-none">
+                            <td colspan="4" class="text-center py-4 text-muted">
+                                Няма намерени услуги по това търсене.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -617,6 +740,219 @@
     if (params.get('tab') === 'schedule' || params.has('q')) {
         activatePosTab('schedule');
     }
+
+    var productSearch = document.getElementById('productSearch');
+    var productSortButton = document.getElementById('productSortButton');
+    var clearProductSearch = document.getElementById('clearProductSearch');
+    var productResultCount = document.getElementById('productResultCount');
+    var noProductResults = document.getElementById('noProductResults');
+    var productRows = Array.from(document.querySelectorAll('.product-row'));
+    var productTableBody = productRows.length ? productRows[0].parentElement : null;
+    var productSortOptions = document.querySelectorAll('.product-sort-dropdown .dropdown-item');
+    var currentProductFilter = 'all';
+    var currentProductSort = 'default';
+
+    function getProductCountLabel(count) {
+        return count === 1 ? '1 продукт' : count + ' продукта';
+    }
+
+    function getQuantitySortValue(row) {
+        var quantity = Number(row.dataset.quantity);
+        return quantity < 0 ? Number.MAX_SAFE_INTEGER : quantity;
+    }
+
+    function sortProductRows() {
+        if (!productTableBody) {
+            return;
+        }
+
+        productRows.sort(function(a, b) {
+            if (currentProductSort === 'default') {
+                return Number(a.dataset.index) - Number(b.dataset.index);
+            }
+
+            if (currentProductSort === 'name-asc') {
+                return a.dataset.name.localeCompare(b.dataset.name, 'bg');
+            }
+
+            if (currentProductSort === 'price-asc') {
+                return Number(a.dataset.price) - Number(b.dataset.price);
+            }
+
+            if (currentProductSort === 'price-desc') {
+                return Number(b.dataset.price) - Number(a.dataset.price);
+            }
+
+            if (currentProductSort === 'quantity-asc') {
+                return getQuantitySortValue(a) - getQuantitySortValue(b);
+            }
+
+            return 0;
+        });
+
+        productRows.forEach(function(row) {
+            productTableBody.insertBefore(row, noProductResults);
+        });
+    }
+
+    function filterProducts() {
+        var query = productSearch.value.trim().toLowerCase();
+        var visibleCount = 0;
+
+        sortProductRows();
+
+        productRows.forEach(function(row) {
+            var text = row.textContent.toLowerCase();
+            var matchesQuery = !query || text.includes(query);
+            var matchesFilter = (
+                currentProductFilter === 'all' ||
+                row.dataset.category === currentProductFilter ||
+                row.dataset.stock === currentProductFilter
+            );
+            var isVisible = matchesQuery && matchesFilter;
+
+            row.classList.toggle('d-none', !isVisible);
+            if (isVisible) {
+                visibleCount += 1;
+            }
+        });
+
+        productResultCount.textContent = getProductCountLabel(visibleCount);
+        noProductResults.classList.toggle('d-none', visibleCount > 0);
+    }
+
+    productSearch.addEventListener('input', filterProducts);
+    productSortOptions.forEach(function(option) {
+        option.addEventListener('click', function() {
+            productSortOptions.forEach(function(item) {
+                item.classList.remove('active');
+            });
+            option.classList.add('active');
+
+            if (option.dataset.filter) {
+                currentProductFilter = option.dataset.filter;
+                productSortButton.textContent = 'SORT: ' + option.textContent.trim();
+            }
+
+            if (option.dataset.sort) {
+                currentProductSort = option.dataset.sort;
+                productSortButton.textContent = 'SORT: ' + option.textContent.trim();
+            }
+
+            filterProducts();
+        });
+    });
+    clearProductSearch.addEventListener('click', function() {
+        productSearch.value = '';
+        currentProductFilter = 'all';
+        currentProductSort = 'default';
+        productSortButton.textContent = 'SORT: Всички';
+        productSortOptions.forEach(function(item) {
+            item.classList.toggle('active', item.dataset.filter === 'all');
+        });
+        filterProducts();
+        productSearch.focus();
+    });
+
+    var serviceSearch = document.getElementById('serviceSearch');
+    var serviceSortButton = document.getElementById('serviceSortButton');
+    var clearServiceSearch = document.getElementById('clearServiceSearch');
+    var serviceResultCount = document.getElementById('serviceResultCount');
+    var noServiceResults = document.getElementById('noServiceResults');
+    var serviceRows = Array.from(document.querySelectorAll('.service-row'));
+    var serviceTableBody = serviceRows.length ? serviceRows[0].parentElement : null;
+    var serviceSortOptions = document.querySelectorAll('.service-sort-dropdown .dropdown-item');
+    var currentServiceFilter = 'all';
+    var currentServiceSort = 'default';
+
+    function getServiceCountLabel(count) {
+        return count === 1 ? '1 услуга' : count + ' услуги';
+    }
+
+    function sortServiceRows() {
+        if (!serviceTableBody) {
+            return;
+        }
+
+        serviceRows.sort(function(a, b) {
+            if (currentServiceSort === 'default') {
+                return Number(a.dataset.index) - Number(b.dataset.index);
+            }
+
+            if (currentServiceSort === 'name-asc') {
+                return a.dataset.name.localeCompare(b.dataset.name, 'bg');
+            }
+
+            if (currentServiceSort === 'price-asc') {
+                return Number(a.dataset.price) - Number(b.dataset.price);
+            }
+
+            if (currentServiceSort === 'price-desc') {
+                return Number(b.dataset.price) - Number(a.dataset.price);
+            }
+
+            return 0;
+        });
+
+        serviceRows.forEach(function(row) {
+            serviceTableBody.insertBefore(row, noServiceResults);
+        });
+    }
+
+    function filterServices() {
+        var query = serviceSearch.value.trim().toLowerCase();
+        var visibleCount = 0;
+
+        sortServiceRows();
+
+        serviceRows.forEach(function(row) {
+            var text = row.textContent.toLowerCase();
+            var matchesQuery = !query || text.includes(query);
+            var matchesFilter = currentServiceFilter === 'all' || row.dataset.category === currentServiceFilter;
+            var isVisible = matchesQuery && matchesFilter;
+
+            row.classList.toggle('d-none', !isVisible);
+            if (isVisible) {
+                visibleCount += 1;
+            }
+        });
+
+        serviceResultCount.textContent = getServiceCountLabel(visibleCount);
+        noServiceResults.classList.toggle('d-none', visibleCount > 0);
+    }
+
+    serviceSearch.addEventListener('input', filterServices);
+    serviceSortOptions.forEach(function(option) {
+        option.addEventListener('click', function() {
+            serviceSortOptions.forEach(function(item) {
+                item.classList.remove('active');
+            });
+            option.classList.add('active');
+
+            if (option.dataset.filter) {
+                currentServiceFilter = option.dataset.filter;
+                serviceSortButton.textContent = 'SORT: ' + option.textContent.trim();
+            }
+
+            if (option.dataset.sort) {
+                currentServiceSort = option.dataset.sort;
+                serviceSortButton.textContent = 'SORT: ' + option.textContent.trim();
+            }
+
+            filterServices();
+        });
+    });
+    clearServiceSearch.addEventListener('click', function() {
+        serviceSearch.value = '';
+        currentServiceFilter = 'all';
+        currentServiceSort = 'default';
+        serviceSortButton.textContent = 'SORT: Всички';
+        serviceSortOptions.forEach(function(item) {
+            item.classList.toggle('active', item.dataset.filter === 'all');
+        });
+        filterServices();
+        serviceSearch.focus();
+    });
 
     setTimeout(function() {
         document.querySelectorAll('.auto-dismiss-alert').forEach(function(alertElement) {

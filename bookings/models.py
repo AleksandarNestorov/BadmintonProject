@@ -34,15 +34,20 @@ class Court(models.Model):
 
 # 4. Продукти и Услуги
 CATEGORY_CHOICES = (
-    ('service', 'Услуга (Наем, Наплитане)'),
-    ('product', 'Стока (Вода, Екипировка)'),
+    ('drink', 'Напитка/Храна'),
+    ('game', 'Игра'),
+    ('rental', 'Наем'),
+    ('stringing', 'Наплитане'),
+    ('training', 'Тренировка'),
+    ('product', 'Стока'),
 )
 
 class Product(models.Model):
     name = models.CharField(max_length=100, verbose_name="Име")
+    description = models.CharField(max_length=200, blank=True, default='', verbose_name="Пояснение")
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='product', verbose_name="Категория")
     price = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="Цена")
-    quantity = models.IntegerField(default=0, verbose_name="Наличност") 
+    quantity = models.IntegerField(default=0, blank=True, null=True, verbose_name="Наличност") 
     image = models.ImageField(upload_to='products/', blank=True, null=True)
 
     def __str__(self):

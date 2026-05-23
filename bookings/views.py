@@ -31,7 +31,9 @@ def is_slot_bookable(selected_date, hour):
 
 # --- 1. НАЧАЛНА СТРАНИЦА ---
 def home(request):
-    products = Product.objects.exclude(name__iexact='Минерална вода')
+    public_price_names = ['Игра за 1 час', 'Наем на ракета', 'Наем на перо']
+    products = Product.objects.filter(name__in=public_price_names)
+    products = sorted(products, key=lambda product: public_price_names.index(product.name))
     trainers = TrainerProfile.objects.all()
     context = {'products': products, 'trainers': trainers}
     return render(request, 'home.html', context)
@@ -194,8 +196,9 @@ def reception(request):
     else:
         selected_date = timezone.now().date()
 
-    products = Product.objects.all()
-    service_products = products.filter(category__in=['service', 'equipment'])
+    all_products = Product.objects.all()
+    products = all_products.filter(category__in=['drink', 'product']).order_by('category', 'name')
+    service_products = all_products.filter(category__in=['game', 'rental', 'stringing', 'training']).order_by('category', 'name')
     courts = Court.objects.filter(is_active=True)
     hours_range = range(8, 22)
     
@@ -262,7 +265,12 @@ def sell_product(request, product_id):
         
     if request.method == 'POST':
         product = get_object_or_404(Product, id=product_id)
-        if product.quantity > 0:
+        if product.quantity is None:
+            if product.category in ['game', 'rental', 'stringing', 'training']:
+                messages.success(request, f'Добавихте услуга: {product.name}.')
+            else:
+                messages.success(request, f'Продадохте 1 бр. {product.name}.')
+        elif product.quantity > 0:
             product.quantity -= 1
             product.save()
             # Тук може да се добави запис в Sale/SaleItem, но за простота сега само намаляме бройката
