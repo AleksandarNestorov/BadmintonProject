@@ -6,11 +6,29 @@ class User(AbstractUser):
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Телефон")
     
     ROLE_CHOICES = (
-        ('client', 'Клиент'),
-        ('employee', 'Служител'),
-        ('admin', 'Администратор'),
+        ('customer', 'Customer'),
+        ('trainer', 'Trainer'),
+        ('employee', 'Employee'),
+        ('admin', 'Admin'),
     )
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='client')
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='customer')
+
+    def save(self, *args, **kwargs):
+        if self.role == 'admin':
+            self.is_staff = True
+        elif not self.is_superuser:
+            self.is_staff = False
+        super().save(*args, **kwargs)
+
+    def has_perm(self, perm, obj=None):
+        if self.is_active and self.role == 'admin':
+            return True
+        return super().has_perm(perm, obj)
+
+    def has_module_perms(self, app_label):
+        if self.is_active and self.role == 'admin':
+            return True
+        return super().has_module_perms(app_label)
 
 # 2. Треньор
 class TrainerProfile(models.Model):

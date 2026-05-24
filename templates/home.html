@@ -288,6 +288,34 @@
             padding: 0.85rem 1rem;
             color: #222;
         }
+        .site-footer {
+            background: #0f172a;
+            color: #cbd5e1;
+        }
+        .site-footer-title {
+            color: #fff;
+            font-size: 0.82rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.04rem;
+            margin-bottom: 0.75rem;
+        }
+        .site-footer-link {
+            color: #cbd5e1;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.45rem;
+            text-decoration: none;
+            font-weight: 700;
+            margin-bottom: 0.45rem;
+        }
+        .site-footer-link:hover {
+            color: #ffc107;
+        }
+        .site-footer-bottom {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: #94a3b8;
+        }
         @media (max-width: 767.98px) {
             .trainer-img,
             .trainer-photo-placeholder {
@@ -313,6 +341,11 @@
             {% if user.is_superuser or user.role == 'admin' or user.role == 'employee' %}
                 <li class="nav-item">
                     <a href="{% url 'reception' %}" class="nav-link reception-link">Рецепция</a>
+                </li>
+            {% endif %}
+            {% if user.is_superuser or user.role == 'admin' %}
+                <li class="nav-item">
+                    <a href="{% url 'admin:index' %}" class="nav-link">Админ панел</a>
                 </li>
             {% endif %}
             
@@ -479,9 +512,49 @@
     </div>
 </section>
 
-<footer class="bg-dark text-white py-3 text-center">
+<footer class="site-footer pt-5">
     <div class="container">
-        <p class="mb-0">© 2024 Badminton Hall Manager.</p>
+        <div class="row g-4 pb-4">
+            <div class="col-md-4">
+                <div class="site-footer-title">Бадминтон зала Юнак</div>
+                <p class="mb-0">
+                    Онлайн резервации, график на кортовете и управление на услуги в залата.
+                </p>
+            </div>
+            <div class="col-md-4">
+                <div class="site-footer-title">Карта на сайта</div>
+                <div class="d-flex flex-column align-items-start">
+                    <a href="{% url 'home' %}" class="site-footer-link"><i class="bi bi-house"></i> Начало</a>
+                    <a href="{% url 'schedule' %}" class="site-footer-link"><i class="bi bi-calendar-week"></i> График и резервации</a>
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'profile' %}" class="site-footer-link"><i class="bi bi-person"></i> Моят профил</a>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="site-footer-link"><i class="bi bi-box-arrow-in-right"></i> Вход</a>
+                        <a href="{% url 'register' %}" class="site-footer-link"><i class="bi bi-person-plus"></i> Регистрация</a>
+                    {% endif %}
+                    {% if user.is_authenticated and user.role == 'trainer' %}
+                        <a href="#trainers" class="site-footer-link"><i class="bi bi-trophy"></i> Треньори</a>
+                    {% endif %}
+                    {% if user.is_superuser or user.role == 'admin' or user.role == 'employee' %}
+                        <a href="{% url 'reception' %}" class="site-footer-link"><i class="bi bi-receipt"></i> Рецепция</a>
+                    {% endif %}
+                    {% if user.is_superuser or user.role == 'admin' %}
+                        <a href="{% url 'admin:index' %}" class="site-footer-link"><i class="bi bi-shield-lock"></i> Админ панел</a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="site-footer-title">Достъп</div>
+                {% if user.is_authenticated %}
+                    <p class="mb-0">Влезли сте като <strong>{{ user.get_full_name|default:user.username }}</strong>.</p>
+                {% else %}
+                    <p class="mb-0">Влезте в акаунта си, за да запазвате часове и да виждате своя профил.</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="site-footer-bottom py-3 text-center">
+            <p class="mb-0">© {% now "Y" %} Badminton Hall Manager.</p>
+        </div>
     </div>
 </footer>
 

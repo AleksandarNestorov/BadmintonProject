@@ -14,6 +14,7 @@ from urllib.parse import quote, urlencode
 from zoneinfo import ZoneInfo
 
 BOOKING_GRACE_PERIOD = timedelta(minutes=30)
+BOOKING_MAX_DAYS_AHEAD = 14
 BOOKING_TIME_ZONE = ZoneInfo('Europe/Sofia')
 RECEPTION_BILL_SESSION_KEY = 'reception_bill'
 RECEPTION_SERVICE_CATEGORIES = ['game', 'rental', 'stringing', 'training']
@@ -31,6 +32,35 @@ def is_slot_bookable(selected_date, hour):
         tzinfo=BOOKING_TIME_ZONE,
     )
     return datetime.now(BOOKING_TIME_ZONE) < local_slot_start + BOOKING_GRACE_PERIOD
+
+
+def get_booking_date_bounds():
+    today = timezone.localdate()
+    return today, today + timedelta(days=BOOKING_MAX_DAYS_AHEAD)
+
+
+def parse_schedule_date(date_str):
+    min_date, max_date = get_booking_date_bounds()
+
+    if date_str:
+        try:
+            selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            selected_date = min_date
+    else:
+        selected_date = min_date
+
+    if selected_date < min_date:
+        return min_date, min_date, max_date, True
+    if selected_date > max_date:
+        return max_date, min_date, max_date, True
+
+    return selected_date, min_date, max_date, False
+
+
+def is_date_in_booking_window(selected_date):
+    min_date, max_date = get_booking_date_bounds()
+    return min_date <= selected_date <= max_date
 
 
 def user_can_access_reception(user):
@@ -356,11 +386,9 @@ def register(request):
 
 # --- 3. ГРАФИК (За Клиенти) ---
 def schedule(request):
-    date_str = request.GET.get('date')
-    if date_str:
-        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-    else:
-        selected_date = timezone.now().date()
+    selected_date, min_booking_date, max_booking_date, date_was_clamped = parse_schedule_date(request.GET.get('date'))
+    if date_was_clamped:
+        messages.warning(request, 'Можете да запазвате часове само за днес и до 14 дни напред.')
 
     courts = Court.objects.filter(is_active=True)
     start_hour = 8
@@ -397,6 +425,11 @@ def schedule(request):
         'courts': courts,
         'next_day': str(selected_date + timedelta(days=1)),
         'prev_day': str(selected_date - timedelta(days=1)),
+        'today_date': str(min_booking_date),
+        'min_booking_date': min_booking_date,
+        'max_booking_date': max_booking_date,
+        'can_go_prev_day': selected_date > min_booking_date,
+        'can_go_next_day': selected_date < max_booking_date,
         'can_view_customer_names': (
             request.user.is_authenticated
             and request.user.role in ['admin', 'employee']
@@ -422,6 +455,10 @@ def make_booking(request):
         date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
         start_time = get_slot_start(date_obj, hour)
         end_time = start_time + timedelta(hours=1)
+
+        if not is_date_in_booking_window(date_obj):
+            messages.error(request, 'Можете да запазвате часове само за днес и до 14 дни напред.')
+            return redirect(request.META.get('HTTP_REFERER', 'schedule'))
 
         if not is_slot_bookable(date_obj, hour):
             messages.error(request, 'Този час вече е изминал и не може да бъде запазен.')
@@ -493,11 +530,9 @@ def reception(request):
     if not user_can_access_reception(request.user):
         return redirect('home')
 
-    date_str = request.GET.get('date')
-    if date_str:
-        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-    else:
-        selected_date = timezone.now().date()
+    selected_date, min_booking_date, max_booking_date, date_was_clamped = parse_schedule_date(request.GET.get('date'))
+    if date_was_clamped:
+        messages.warning(request, 'Можете да запазвате часове само за днес и до 14 дни напред.')
 
     all_products = Product.objects.all()
     products = all_products.filter(category__in=['drink', 'product']).order_by('category', 'name')
@@ -560,6 +595,11 @@ def reception(request):
         'hours_range': hours_range,
         'next_day': str(selected_date + timedelta(days=1)),
         'prev_day': str(selected_date - timedelta(days=1)),
+        'today_date': str(min_booking_date),
+        'min_booking_date': min_booking_date,
+        'max_booking_date': max_booking_date,
+        'can_go_prev_day': selected_date > min_booking_date,
+        'can_go_next_day': selected_date < max_booking_date,
         'bill_items': bill_context['items'],
         'bill_total': bill_context['total'],
         'bill_count': bill_context['count'],

@@ -40,7 +40,7 @@ class Command(BaseCommand):
             user.first_name = trainer["first_name"]
             user.last_name = trainer["last_name"]
             user.email = f"{trainer['username']}@badminton.local"
-            user.role = "client"
+            user.role = "trainer"
             user.is_active = False
             user.set_unusable_password()
             user.save()

@@ -832,9 +832,26 @@
                 <i class="far fa-calendar-alt me-2 text-primary"></i> 
                 <span class="text-dark">{{ selected_date|date:"d.m.Y" }}</span>
             </div>
-            <div>
-                <a href="?date={{ prev_day }}&tab=schedule{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn btn-sm btn-outline-secondary px-3"><i class="fas fa-chevron-left"></i></a>
-                <a href="?date={{ next_day }}&tab=schedule{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn btn-sm btn-outline-secondary px-3"><i class="fas fa-chevron-right"></i></a>
+            <div class="d-flex flex-wrap align-items-center justify-content-end gap-2">
+                {% if can_go_prev_day %}
+                    <a href="?date={{ prev_day }}&tab=schedule{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn btn-sm btn-outline-secondary px-3"><i class="fas fa-chevron-left"></i></a>
+                {% else %}
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3" disabled><i class="fas fa-chevron-left"></i></button>
+                {% endif %}
+                <a href="?date={{ today_date }}&tab=schedule{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn btn-sm btn-outline-primary px-3">Днес</a>
+                <form method="get" action="{% url 'reception' %}" class="d-flex gap-2">
+                    <input type="hidden" name="tab" value="schedule">
+                    {% if search_query %}
+                        <input type="hidden" name="q" value="{{ search_query }}">
+                    {% endif %}
+                    <input type="date" name="date" class="form-control form-control-sm" value="{{ selected_date|date:'Y-m-d' }}" min="{{ min_booking_date|date:'Y-m-d' }}" max="{{ max_booking_date|date:'Y-m-d' }}">
+                    <button type="submit" class="btn btn-sm btn-primary">Покажи</button>
+                </form>
+                {% if can_go_next_day %}
+                    <a href="?date={{ next_day }}&tab=schedule{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn btn-sm btn-outline-secondary px-3"><i class="fas fa-chevron-right"></i></a>
+                {% else %}
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3" disabled><i class="fas fa-chevron-right"></i></button>
+                {% endif %}
             </div>
         </div>
 

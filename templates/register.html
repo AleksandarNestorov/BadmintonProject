@@ -22,7 +22,7 @@
                 </div>
                 <div class="card-body">
                     
-                    <form method="POST">
+                    <form method="POST" id="registerForm" novalidate>
                         {% csrf_token %} {% for field in form %}
                         <div class="mb-3">
                             <label class="form-label fw-bold">{{ field.label }}</label>
@@ -62,6 +62,90 @@
 
     var countrySelect = document.getElementById('id_phone_country');
     var phoneInput = document.getElementById('id_phone');
+    var registerForm = document.getElementById('registerForm');
+
+    function getFeedbackElement(input) {
+        var fieldWrapper = input.closest('.mb-3');
+        var feedback = fieldWrapper.querySelector('.client-invalid-feedback');
+
+        if (!feedback) {
+            feedback = document.createElement('div');
+            feedback.className = 'invalid-feedback client-invalid-feedback';
+            fieldWrapper.appendChild(feedback);
+        }
+
+        return feedback;
+    }
+
+    function setRegisterFieldState(input, isValid, message) {
+        var feedback = getFeedbackElement(input);
+        feedback.textContent = message || '';
+        input.classList.toggle('is-invalid', !isValid);
+        input.classList.toggle('is-valid', isValid && input.value.trim().length > 0);
+    }
+
+    function validateRequired(input, message) {
+        var isValid = input.value.trim().length > 0;
+        setRegisterFieldState(input, isValid, message);
+        return isValid;
+    }
+
+    function validateName(input, message) {
+        var value = input.value.trim();
+        var isValid = value.length >= 2;
+        setRegisterFieldState(input, isValid, message);
+        return isValid;
+    }
+
+    function validateUsername(input) {
+        var value = input.value.trim();
+        var isValid = /^[A-Za-z0-9_@.+-]{3,150}$/.test(value);
+        setRegisterFieldState(input, isValid, 'Потребителското име трябва да е поне 3 символа и да съдържа само латински букви, цифри и стандартни символи.');
+        return isValid;
+    }
+
+    function validateEmail(input) {
+        var value = input.value.trim();
+        var isLatinOnly = /^[A-Za-z0-9._%+\-@]+$/.test(value);
+        var hasValidFormat = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/.test(value);
+        var isValid = isLatinOnly && hasValidFormat;
+        setRegisterFieldState(input, isValid, 'Имейлът трябва да бъде валиден и изписан с латински букви.');
+        return isValid;
+    }
+
+    function validatePhone() {
+        if (!countrySelect || !phoneInput) return true;
+
+        var rule = rules[countrySelect.value];
+        if (!rule) return true;
+
+        var digits = phoneInput.value.replace(/\D/g, '');
+        var prefixDigits = rule.prefix.replace(/\D/g, '');
+
+        if (digits.indexOf(prefixDigits) === 0) {
+            digits = digits.slice(prefixDigits.length);
+        }
+
+        var isValid = digits.length === Number(rule.digits);
+        setRegisterFieldState(
+            phoneInput,
+            isValid,
+            'Телефонът трябва да съдържа точно ' + rule.digits + ' цифри след ' + rule.prefix + '.'
+        );
+        return isValid;
+    }
+
+    function validatePassword(passwordInput) {
+        var isValid = passwordInput.value.length >= 8;
+        setRegisterFieldState(passwordInput, isValid, 'Паролата трябва да съдържа поне 8 символа.');
+        return isValid;
+    }
+
+    function validatePasswordMatch(passwordInput, confirmInput) {
+        var isValid = confirmInput.value.length > 0 && confirmInput.value === passwordInput.value;
+        setRegisterFieldState(confirmInput, isValid, 'Двете пароли трябва да съвпадат.');
+        return isValid;
+    }
 
     if (countrySelect && phoneInput) {
         var rules = {};
@@ -86,7 +170,45 @@
         }
 
         countrySelect.addEventListener('change', updatePhoneHint);
+        countrySelect.addEventListener('change', validatePhone);
+        phoneInput.addEventListener('input', validatePhone);
         updatePhoneHint();
+    }
+
+    if (registerForm) {
+        var usernameInput = registerForm.querySelector('[name="username"]');
+        var firstNameInput = registerForm.querySelector('[name="first_name"]');
+        var lastNameInput = registerForm.querySelector('[name="last_name"]');
+        var emailInput = registerForm.querySelector('[name="email"]');
+        var passwordInput = registerForm.querySelector('[name="password1"]');
+        var confirmInput = registerForm.querySelector('[name="password2"]');
+
+        registerForm.addEventListener('submit', function(event) {
+            var isValid = true;
+
+            if (usernameInput) isValid = validateUsername(usernameInput) && isValid;
+            if (firstNameInput) isValid = validateName(firstNameInput, 'Моля, въведете име с поне 2 символа.') && isValid;
+            if (lastNameInput) isValid = validateName(lastNameInput, 'Моля, въведете фамилия с поне 2 символа.') && isValid;
+            if (emailInput) isValid = validateEmail(emailInput) && isValid;
+            if (phoneInput) isValid = validatePhone() && isValid;
+            if (passwordInput) isValid = validatePassword(passwordInput) && isValid;
+            if (passwordInput && confirmInput) isValid = validatePasswordMatch(passwordInput, confirmInput) && isValid;
+
+            if (!isValid) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        });
+
+        if (usernameInput) usernameInput.addEventListener('input', function() { validateUsername(usernameInput); });
+        if (firstNameInput) firstNameInput.addEventListener('input', function() { validateName(firstNameInput, 'Моля, въведете име с поне 2 символа.'); });
+        if (lastNameInput) lastNameInput.addEventListener('input', function() { validateName(lastNameInput, 'Моля, въведете фамилия с поне 2 символа.'); });
+        if (emailInput) emailInput.addEventListener('input', function() { validateEmail(emailInput); });
+        if (passwordInput) passwordInput.addEventListener('input', function() {
+            validatePassword(passwordInput);
+            if (confirmInput && confirmInput.value) validatePasswordMatch(passwordInput, confirmInput);
+        });
+        if (confirmInput) confirmInput.addEventListener('input', function() { validatePasswordMatch(passwordInput, confirmInput); });
     }
 </script>
 
