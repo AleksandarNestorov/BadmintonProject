@@ -116,6 +116,112 @@ def attendance_sum(start, end=None):
     return SaleItem.objects.filter(sale_item_filter).aggregate(total=Sum('quantity'))['total'] or 0
 
 
+def money_text(value):
+    return f"{(value or Decimal('0.00')):.2f}"
+
+
+def build_shift_report_snapshot(shift_start, end=None):
+    end = end or timezone.now()
+    sales = list(
+        Sale.objects
+        .filter(created_at__gte=shift_start, created_at__lt=end)
+        .prefetch_related('saleitem_set__product')
+        .order_by('-created_at')
+    )
+    cash_transactions = list(
+        CashTransaction.objects
+        .filter(created_at__gte=shift_start, created_at__lt=end)
+        .order_by('-created_at')
+    )
+
+    product_summary = {}
+    service_summary = {}
+
+    serialized_sales = []
+    for sale in sales:
+        serialized_items = []
+        for item in sale.saleitem_set.all():
+            product = item.product
+            item_name = product.name if product else 'Изтрит продукт'
+            category = product.category if product else ''
+            category_label = product.get_category_display() if product else '-'
+            line_total = item.price_at_sale * item.quantity
+            serialized_items.append({
+                'name': item_name,
+                'category': category,
+                'category_label': category_label,
+                'quantity': item.quantity,
+                'price': money_text(item.price_at_sale),
+                'total': money_text(line_total),
+            })
+
+            summary_target = service_summary if category in RECEPTION_SERVICE_CATEGORIES else product_summary
+            summary_key = f"{item_name}|{category}|{money_text(item.price_at_sale)}"
+            if summary_key not in summary_target:
+                summary_target[summary_key] = {
+                    'name': item_name,
+                    'category': category,
+                    'category_label': category_label,
+                    'quantity': 0,
+                    'total_amount': Decimal('0.00'),
+                }
+            summary_target[summary_key]['quantity'] += item.quantity
+            summary_target[summary_key]['total_amount'] += line_total
+
+        serialized_sales.append({
+            'id': sale.id,
+            'time': timezone.localtime(sale.created_at).strftime('%d.%m.%Y %H:%M'),
+            'payment_method': sale.get_payment_method_display(),
+            'total': money_text(sale.total_amount),
+            'items': serialized_items,
+        })
+
+    def serialize_summary(summary):
+        return [
+            {
+                'name': item['name'],
+                'category': item['category'],
+                'category_label': item['category_label'],
+                'quantity': item['quantity'],
+                'total': money_text(item['total_amount']),
+            }
+            for item in sorted(summary.values(), key=lambda value: value['name'])
+        ]
+
+    cash_total = sum((sale.total_amount for sale in sales if sale.payment_method == 'cash'), Decimal('0.00'))
+    card_total = sum((sale.total_amount for sale in sales if sale.payment_method == 'card'), Decimal('0.00'))
+    sales_total = cash_total + card_total
+    cash_balance = sum((item.amount for item in cash_transactions), Decimal('0.00'))
+
+    return {
+        'period': {
+            'start': timezone.localtime(shift_start).strftime('%d.%m.%Y %H:%M'),
+            'end': timezone.localtime(end).strftime('%d.%m.%Y %H:%M'),
+        },
+        'totals': {
+            'sales_total': money_text(sales_total),
+            'cash_total': money_text(cash_total),
+            'card_total': money_text(card_total),
+            'cash_balance': money_text(cash_balance),
+        },
+        'sales_count': len(sales),
+        'cash_transactions_count': len(cash_transactions),
+        'attendance': attendance_sum(shift_start, end),
+        'sales': serialized_sales,
+        'product_summary': serialize_summary(product_summary),
+        'service_summary': serialize_summary(service_summary),
+        'cash_transactions': [
+            {
+                'time': timezone.localtime(item.created_at).strftime('%d.%m.%Y %H:%M'),
+                'type': item.get_transaction_type_display(),
+                'amount': money_text(item.amount),
+                'comment': item.comment or '-',
+            }
+            for item in cash_transactions
+        ],
+    }
+
+
 def get_current_shift_start(today_start):
     last_close = ShiftClose.objects.filter(closed_at__gte=today_start).order_by('-closed_at').first()
     return last_close.closed_at if last_close else today_start
@@ -126,6 +232,7 @@ def build_reception_reports_context(request):
     selected_day_value = request.GET.get('report_date') or today_start.strftime('%Y-%m-%d')
     selected_month_value = request.GET.get('report_month') or current_month_start.strftime('%Y-%m')
     selected_year_value = request.GET.get('report_year') or str(current_year_start.year)
+    selected_archive_value = request.GET.get('archive_date') or ''
 
     try:
         selected_day_year, selected_day_month, selected_day = [int(part) for part in selected_day_value.split('-')]
@@ -165,6 +272,22 @@ def build_reception_reports_context(request):
     daily_cash_transactions = CashTransaction.objects.filter(created_at__gte=daily_start, created_at__lt=day_end)
     current_cash_transactions = CashTransaction.objects.filter(created_at__gte=shift_start)
     daily_sales = list(daily_sales_queryset.prefetch_related('saleitem_set__product').order_by('-created_at'))
+    current_shift_report = build_shift_report_snapshot(shift_start)
+
+    archive_is_filtered = False
+    selected_archive_label = 'последни 30 приключвания'
+    shift_close_archive_queryset = ShiftClose.objects.order_by('-closed_at')
+    if selected_archive_value:
+        try:
+            archive_year, archive_month, archive_day = [int(part) for part in selected_archive_value.split('-')]
+            archive_start, archive_end = get_day_bounds(archive_year, archive_month, archive_day)
+            shift_close_archive_queryset = shift_close_archive_queryset.filter(closed_at__gte=archive_start, closed_at__lt=archive_end)
+            selected_archive_label = archive_start.strftime('%d.%m.%Y')
+            archive_is_filtered = True
+        except (TypeError, ValueError):
+            selected_archive_value = ''
+
+    shift_close_archive = shift_close_archive_queryset[:30]
 
     return {
         'cash_balance': money_sum(current_cash_transactions, 'amount'),
@@ -194,6 +317,11 @@ def build_reception_reports_context(request):
         'daily_sales_has_more': len(daily_sales) > 5,
         'cash_transactions': current_cash_transactions.order_by('-created_at')[:20],
         'recent_shift_closes': ShiftClose.objects.filter(closed_at__gte=day_start, closed_at__lt=day_end).order_by('-closed_at'),
+        'current_shift_report': current_shift_report,
+        'shift_close_archive': shift_close_archive,
+        'selected_archive_value': selected_archive_value,
+        'selected_archive_label': selected_archive_label,
+        'archive_is_filtered': archive_is_filtered,
     }
 
 
@@ -591,6 +719,18 @@ def add_cash_transaction(request):
             return redirect_back_to_reception(request)
 
         if transaction_type == 'out':
+            today_start, _, _ = get_report_periods()
+            shift_start = get_current_shift_start(today_start)
+            current_cash_balance = money_sum(
+                CashTransaction.objects.filter(created_at__gte=shift_start),
+                'amount',
+            )
+            if amount > current_cash_balance:
+                messages.error(
+                    request,
+                    f'Не може да извадите {amount:.2f} €, защото в касата има само {current_cash_balance:.2f} €.',
+                )
+                return redirect_back_to_reception(request)
             amount = -amount
         elif transaction_type != 'in':
             messages.error(request, 'Невалиден тип касова операция.')
@@ -622,13 +762,12 @@ def close_day(request):
 
     today_start, _, _ = get_report_periods()
     shift_start = get_current_shift_start(today_start)
-    sales = Sale.objects.filter(created_at__gte=shift_start)
-    cash_transactions = CashTransaction.objects.filter(created_at__gte=shift_start)
-    sales_total = money_sum(sales)
-    cash_total = money_sum(sales.filter(payment_method='cash'))
-    card_total = money_sum(sales.filter(payment_method='card'))
-    cash_balance = money_sum(cash_transactions, 'amount')
-    attendance = attendance_sum(shift_start)
+    report_snapshot = build_shift_report_snapshot(shift_start)
+    sales_total = Decimal(report_snapshot['totals']['sales_total'])
+    cash_total = Decimal(report_snapshot['totals']['cash_total'])
+    card_total = Decimal(report_snapshot['totals']['card_total'])
+    cash_balance = Decimal(report_snapshot['totals']['cash_balance'])
+    attendance = report_snapshot['attendance']
     comment = request.POST.get('comment', '').strip() or 'Приключване на деня'
 
     with transaction.atomic():
@@ -642,11 +781,15 @@ def close_day(request):
 
         ShiftClose.objects.create(
             cashier=request.user,
+            shift_started_at=shift_start,
             sales_total=sales_total,
             cash_total=cash_total,
             card_total=card_total,
             cash_balance=cash_balance,
+            sales_count=report_snapshot['sales_count'],
+            cash_transactions_count=report_snapshot['cash_transactions_count'],
             attendance=attendance,
+            report_data=report_snapshot,
             comment=comment,
         )
 

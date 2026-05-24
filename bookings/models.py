@@ -116,12 +116,16 @@ class CashTransaction(models.Model):
 
 class ShiftClose(models.Model):
     cashier = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Касиер")
+    shift_started_at = models.DateTimeField(blank=True, null=True, verbose_name="Начало на смяна")
     closed_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата на приключване")
     sales_total = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Оборот")
     cash_total = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="В брой")
     card_total = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="С карта")
     cash_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Наличност каса")
+    sales_count = models.IntegerField(default=0, verbose_name="Брой продажби")
+    cash_transactions_count = models.IntegerField(default=0, verbose_name="Брой касови движения")
     attendance = models.IntegerField(default=0, verbose_name="Посещаемост")
+    report_data = models.JSONField(blank=True, default=dict, verbose_name="Подробен отчет")
     comment = models.CharField(max_length=200, blank=True, default='', verbose_name="Коментар")
 
     def __str__(self):

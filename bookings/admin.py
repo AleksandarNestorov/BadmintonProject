@@ -9,4 +9,7 @@ admin.site.register(TrainerProfile)
 admin.site.register(Sale)
 admin.site.register(SaleItem)
 admin.site.register(CashTransaction)
-admin.site.register(ShiftClose)
+@admin.register(ShiftClose)
+class ShiftCloseAdmin(admin.ModelAdmin):
+    list_display = ('closed_at', 'cashier', 'sales_total', 'cash_total', 'card_total', 'cash_balance', 'sales_count', 'attendance')
+    readonly_fields = ('report_data',)

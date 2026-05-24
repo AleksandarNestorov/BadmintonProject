@@ -445,6 +445,37 @@
             font-size: 1.55rem;
             font-weight: 900;
         }
+        #closeDayModal .modal-content {
+            max-height: calc(100vh - 32px);
+        }
+        #closeDayModal form {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        #closeDayModal .modal-body {
+            overflow-y: auto;
+            max-height: calc(100vh - 180px);
+        }
+        #closeDayModal .modal-footer {
+            background: #fff;
+            border-top: 1px solid #e2e8f0;
+            flex-shrink: 0;
+            position: sticky;
+            bottom: 0;
+            z-index: 5;
+            box-shadow: 0 -8px 18px rgba(15, 23, 42, 0.08);
+        }
+        .report-scroll-table {
+            max-height: 240px;
+            overflow-y: auto;
+        }
+        .report-scroll-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #f8fafc;
+        }
         @media (max-width: 1199.98px) {
             .main-workspace {
                 padding-right: 15px;
@@ -518,6 +549,9 @@
                 </button>
                 <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#cashAdjustModal">
                     <i class="fas fa-plus-minus me-2"></i> Добави/извади от каса
+                </button>
+                <button class="dropdown-item reset-report-btn" type="button" data-bs-toggle="modal" data-bs-target="#shiftArchiveModal" data-report-url="{% url 'reception' %}?open_report=archive">
+                    <i class="fas fa-box-archive me-2"></i> Архив приключвания
                 </button>
                 <div class="dropdown-divider border-secondary my-0"></div>
                 <button class="dropdown-item text-warning" type="button" data-bs-toggle="modal" data-bs-target="#closeDayModal">
@@ -1094,6 +1128,7 @@
                                     <th>Дата</th>
                                     <th>Каса</th>
                                     <th>Оборот</th>
+                                    <th>Продажби</th>
                                     <th>Посещаемост</th>
                                 </tr>
                             </thead>
@@ -1103,10 +1138,11 @@
                                     <td>{{ shift_close.closed_at|date:"d.m.Y H:i" }}</td>
                                     <td>{{ shift_close.cash_balance }} €</td>
                                     <td>{{ shift_close.sales_total }} €</td>
+                                    <td>{{ shift_close.sales_count }}</td>
                                     <td>{{ shift_close.attendance }}</td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="4" class="text-center text-muted py-4">Все още няма приключени дни.</td></tr>
+                                <tr><td colspan="5" class="text-center text-muted py-4">Все още няма приключени дни.</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -1309,6 +1345,7 @@
                     <div class="mb-3">
                         <label class="form-label fw-bold">Сума</label>
                         <input type="number" name="amount" class="form-control" min="0.01" step="0.01" placeholder="50.00" required>
+                        <div class="form-text">Текуща наличност в касата: {{ cash_balance }} €</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">Коментар</label>
@@ -1324,35 +1361,344 @@
     </div>
 </div>
 
-<div class="modal fade" id="closeDayModal" tabindex="-1">
-    <div class="modal-dialog">
+<div class="modal fade" id="shiftArchiveModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title"><i class="fas fa-lock me-2"></i> Приключване на деня</h5>
+                <h5 class="modal-title"><i class="fas fa-box-archive me-2"></i> Архив на приключванията</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <form method="get" action="{% url 'reception' %}" class="row g-2 align-items-end mb-3">
+                    <input type="hidden" name="open_report" value="archive">
+                    <div class="col-md-5">
+                        <label class="form-label fw-bold">Избери дата</label>
+                        <input type="date" name="archive_date" class="form-control" value="{{ selected_archive_value }}">
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary fw-bold">Покажи</button>
+                    </div>
+                    <div class="col-auto">
+                        <a href="{% url 'reception' %}?open_report=archive" class="btn btn-outline-secondary fw-bold">Последни</a>
+                    </div>
+                    <div class="col-12">
+                        <div class="small text-muted">
+                            Показват се {{ selected_archive_label }}{% if archive_is_filtered %}.{% else %}. Избери дата, за да видиш приключванията само за конкретен ден.{% endif %}
+                        </div>
+                    </div>
+                </form>
+                <div class="accordion" id="shiftArchiveAccordion">
+                    {% for shift_close in shift_close_archive %}
+                    <div class="accordion-item border-0 shadow-sm mb-2">
+                        <h2 class="accordion-header" id="shiftArchiveHeading{{ shift_close.id }}">
+                            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#shiftArchiveCollapse{{ shift_close.id }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="shiftArchiveCollapse{{ shift_close.id }}">
+                                <span class="fw-bold me-3">{{ shift_close.closed_at|date:"d.m.Y H:i" }}</span>
+                                <span class="badge bg-dark me-2">{{ shift_close.sales_total }} €</span>
+                                <span class="badge bg-secondary me-2">{{ shift_close.sales_count }} продажби</span>
+                                <span class="badge bg-primary">{{ shift_close.attendance }} посещения</span>
+                            </button>
+                        </h2>
+                        <div id="shiftArchiveCollapse{{ shift_close.id }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="shiftArchiveHeading{{ shift_close.id }}" data-bs-parent="#shiftArchiveAccordion">
+                            <div class="accordion-body">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-3">
+                                        <div class="report-card">
+                                            <div class="report-label">Оборот</div>
+                                            <div class="report-value">{{ shift_close.sales_total }} €</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="report-card">
+                                            <div class="report-label">В брой</div>
+                                            <div class="report-value">{{ shift_close.cash_total }} €</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="report-card">
+                                            <div class="report-label">С карта</div>
+                                            <div class="report-value">{{ shift_close.card_total }} €</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="report-card">
+                                            <div class="report-label">Каса при приключване</div>
+                                            <div class="report-value">{{ shift_close.cash_balance }} €</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="small text-muted mb-3">
+                                    Период:
+                                    {% if shift_close.report_data.period.start %}
+                                        {{ shift_close.report_data.period.start }} - {{ shift_close.report_data.period.end }}
+                                    {% elif shift_close.shift_started_at %}
+                                        {{ shift_close.shift_started_at|date:"d.m.Y H:i" }} - {{ shift_close.closed_at|date:"d.m.Y H:i" }}
+                                    {% else %}
+                                        {{ shift_close.closed_at|date:"d.m.Y" }}
+                                    {% endif %}
+                                    · Касиер: {{ shift_close.cashier.get_full_name|default:shift_close.cashier.username|default:"-" }}
+                                    · Коментар: {{ shift_close.comment|default:"-" }}
+                                </div>
+
+                                <div class="row g-3">
+                                    <div class="col-lg-6">
+                                        <div class="card border-0">
+                                            <div class="card-header fw-bold">Продукти</div>
+                                            <div class="table-responsive report-scroll-table">
+                                                <table class="table table-sm align-middle mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Артикул</th>
+                                                            <th class="text-center">Бр.</th>
+                                                            <th class="text-end">Сума</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for item in shift_close.report_data.product_summary %}
+                                                        <tr>
+                                                            <td>{{ item.name }}</td>
+                                                            <td class="text-center">{{ item.quantity }}</td>
+                                                            <td class="text-end fw-bold">{{ item.total }} €</td>
+                                                        </tr>
+                                                        {% empty %}
+                                                        <tr><td colspan="3" class="text-center text-muted py-3">Няма записани продукти.</td></tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <div class="card border-0">
+                                            <div class="card-header fw-bold">Услуги</div>
+                                            <div class="table-responsive report-scroll-table">
+                                                <table class="table table-sm align-middle mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Услуга</th>
+                                                            <th class="text-center">Бр.</th>
+                                                            <th class="text-end">Сума</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for item in shift_close.report_data.service_summary %}
+                                                        <tr>
+                                                            <td>{{ item.name }}</td>
+                                                            <td class="text-center">{{ item.quantity }}</td>
+                                                            <td class="text-end fw-bold">{{ item.total }} €</td>
+                                                        </tr>
+                                                        {% empty %}
+                                                        <tr><td colspan="3" class="text-center text-muted py-3">Няма записани услуги.</td></tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="card border-0 mt-3">
+                                    <div class="card-header fw-bold">Продажби в приключването</div>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Час</th>
+                                                    <th>Плащане</th>
+                                                    <th>Артикули</th>
+                                                    <th class="text-end">Сума</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for sale in shift_close.report_data.sales %}
+                                                <tr>
+                                                    <td>{{ sale.time }}</td>
+                                                    <td>{{ sale.payment_method }}</td>
+                                                    <td>
+                                                        {% for item in sale.items %}
+                                                            <span class="badge bg-light text-dark border me-1">{{ item.name }} x{{ item.quantity }}</span>
+                                                        {% endfor %}
+                                                    </td>
+                                                    <td class="text-end fw-bold">{{ sale.total }} €</td>
+                                                </tr>
+                                                {% empty %}
+                                                <tr><td colspan="4" class="text-center text-muted py-3">Няма записани продажби.</td></tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted py-5">Все още няма архивирани приключвания.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="closeDayModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-lock me-2"></i> Преглед преди приключване</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form action="{% url 'close_day' %}" method="post">
                 {% csrf_token %}
                 <input type="hidden" name="active_tab" value="products" class="active-tab-input">
                 <div class="modal-body">
-                    <div class="alert alert-warning">
-                        Това ще приключи текущата смяна и ще нулира дневния отчет и наличността в касата за следващата смяна.
-                        Историята остава запазена в месечните и годишните отчети.
+                    <div class="alert alert-warning d-flex align-items-start gap-2">
+                        <i class="fas fa-triangle-exclamation mt-1"></i>
+                        <div>
+                            Прегледайте отчета преди потвърждение. След приключване системата ще запази архивен snapshot и ще занули наличността в касата за следващата смяна.
+                        </div>
                     </div>
                     <div class="row g-3 mb-3">
-                        <div class="col-6">
-                            <div class="report-card">
-                                <div class="report-label">Каса</div>
-                                <div class="report-value">{{ cash_balance }} €</div>
-                            </div>
-                        </div>
-                        <div class="col-6">
+                        <div class="col-md-3">
                             <div class="report-card">
                                 <div class="report-label">Оборот</div>
-                                <div class="report-value">{{ current_sales_total }} €</div>
+                                <div class="report-value">{{ current_shift_report.totals.sales_total }} €</div>
+                                <div class="small text-muted">{{ current_shift_report.sales_count }} продажби</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="report-card">
+                                <div class="report-label">В брой</div>
+                                <div class="report-value">{{ current_shift_report.totals.cash_total }} €</div>
+                                <div class="small text-muted">Касови продажби</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="report-card">
+                                <div class="report-label">С карта</div>
+                                <div class="report-value">{{ current_shift_report.totals.card_total }} €</div>
+                                <div class="small text-muted">Картови продажби</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="report-card">
+                                <div class="report-label">Каса</div>
+                                <div class="report-value">{{ current_shift_report.totals.cash_balance }} €</div>
+                                <div class="small text-muted">Наличност преди зануляване</div>
                             </div>
                         </div>
                     </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <div class="report-card">
+                                <div class="report-label">Период</div>
+                                <div class="fw-bold">{{ current_shift_report.period.start }}</div>
+                                <div class="small text-muted">до {{ current_shift_report.period.end }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="report-card">
+                                <div class="report-label">Посещаемост</div>
+                                <div class="report-value">{{ current_shift_report.attendance }}</div>
+                                <div class="small text-muted">Игри и тренировки</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="report-card">
+                                <div class="report-label">Касови движения</div>
+                                <div class="report-value">{{ current_shift_report.cash_transactions_count }}</div>
+                                <div class="small text-muted">Внасяния, изваждания и продажби</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-lg-6">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-header fw-bold">Продадени продукти</div>
+                                <div class="table-responsive report-scroll-table">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Артикул</th>
+                                                <th class="text-center">Бр.</th>
+                                                <th class="text-end">Сума</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in current_shift_report.product_summary %}
+                                            <tr>
+                                                <td>{{ item.name }}</td>
+                                                <td class="text-center">{{ item.quantity }}</td>
+                                                <td class="text-end fw-bold">{{ item.total }} €</td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr><td colspan="3" class="text-center text-muted py-3">Няма продадени продукти.</td></tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="card border-0 shadow-sm h-100">
+                                <div class="card-header fw-bold">Използвани услуги</div>
+                                <div class="table-responsive report-scroll-table">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Услуга</th>
+                                                <th class="text-center">Бр.</th>
+                                                <th class="text-end">Сума</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in current_shift_report.service_summary %}
+                                            <tr>
+                                                <td>{{ item.name }}</td>
+                                                <td class="text-center">{{ item.quantity }}</td>
+                                                <td class="text-end fw-bold">{{ item.total }} €</td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr><td colspan="3" class="text-center text-muted py-3">Няма използвани услуги.</td></tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header fw-bold">Последни продажби в смяната</div>
+                        <div class="table-responsive report-scroll-table">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Час</th>
+                                        <th>Плащане</th>
+                                        <th>Артикули</th>
+                                        <th class="text-end">Сума</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for sale in current_shift_report.sales|slice:":8" %}
+                                    <tr>
+                                        <td>{{ sale.time }}</td>
+                                        <td>{{ sale.payment_method }}</td>
+                                        <td>
+                                            {% for item in sale.items %}
+                                                <span class="badge bg-light text-dark border me-1">{{ item.name }} x{{ item.quantity }}</span>
+                                            {% endfor %}
+                                        </td>
+                                        <td class="text-end fw-bold">{{ sale.total }} €</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="4" class="text-center text-muted py-3">Няма продажби в текущата смяна.</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <label class="form-label fw-bold">Коментар</label>
                     <input type="text" name="comment" class="form-control" value="Приключване на деня">
                 </div>
@@ -1401,7 +1747,8 @@
             var hasSelectedReportPeriod = (
                 currentUrl.searchParams.has('report_date') ||
                 currentUrl.searchParams.has('report_month') ||
-                currentUrl.searchParams.has('report_year')
+                currentUrl.searchParams.has('report_year') ||
+                currentUrl.searchParams.has('archive_date')
             );
 
             if (hasSelectedReportPeriod) {
@@ -1441,6 +1788,14 @@
         var yearlyUrl = new URL(window.location.href);
         yearlyUrl.searchParams.delete('open_report');
         window.history.replaceState({}, '', yearlyUrl);
+    }
+
+    if (params.get('open_report') === 'archive') {
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('shiftArchiveModal')).show();
+        params.delete('open_report');
+        var archiveUrl = new URL(window.location.href);
+        archiveUrl.searchParams.delete('open_report');
+        window.history.replaceState({}, '', archiveUrl);
     }
 
     var productSearch = document.getElementById('productSearch');
