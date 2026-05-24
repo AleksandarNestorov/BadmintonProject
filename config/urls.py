@@ -24,5 +24,13 @@ urlpatterns = [
 
     # --- РЕЦЕПЦИЯ (Това липсваше!) ---
     path('reception/', views.reception, name='reception'),
-    path('reception/sell/<int:product_id>/', views.sell_product, name='sell_product'),
+    path('reception/bill/add/<int:product_id>/', views.add_to_bill, name='add_to_bill'),
+    path('reception/bill/decrease/<int:product_id>/', views.decrease_bill_item, name='decrease_bill_item'),
+    path('reception/bill/remove/<int:product_id>/', views.remove_bill_item, name='remove_bill_item'),
+    path('reception/bill/clear/', views.clear_bill, name='clear_bill'),
+    path('reception/bill/checkout/', views.checkout_bill, name='checkout_bill'),
+    path('reception/cash/add/', views.add_cash_transaction, name='add_cash_transaction'),
+    path('reception/close-day/', views.close_day, name='close_day'),
+    path('reception/sale/<int:sale_id>/void/', views.void_sale, name='void_sale'),
+    path('reception/exit/', views.reception_exit, name='reception_exit'),
 ]

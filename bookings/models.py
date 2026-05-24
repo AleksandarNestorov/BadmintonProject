@@ -73,9 +73,15 @@ class Booking(models.Model):
 
 # 6. Продажби (История на покупките от рецепцията) - ТОВА ЛИПСВАШЕ
 class Sale(models.Model):
+    PAYMENT_METHOD_CHOICES = (
+        ('cash', 'В брой'),
+        ('card', 'С карта'),
+    )
+
     cashier = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Касиер")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата на продажба")
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_method = models.CharField(max_length=10, choices=PAYMENT_METHOD_CHOICES, default='cash', verbose_name="Начин на плащане")
 
     def __str__(self):
         return f"Продажба #{self.id} от {self.created_at.strftime('%d.%m %H:%M')}"
@@ -88,3 +94,35 @@ class SaleItem(models.Model):
 
     def __str__(self):
         return f"{self.product.name} x {self.quantity}"
+
+
+class CashTransaction(models.Model):
+    TRANSACTION_TYPE_CHOICES = (
+        ('in', 'Внасяне'),
+        ('out', 'Изваждане'),
+        ('sale', 'Продажба в брой'),
+    )
+
+    cashier = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Касиер")
+    sale = models.ForeignKey(Sale, on_delete=models.SET_NULL, blank=True, null=True, verbose_name="Продажба")
+    transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPE_CHOICES, verbose_name="Тип")
+    amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Сума")
+    comment = models.CharField(max_length=200, blank=True, default='', verbose_name="Коментар")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата")
+
+    def __str__(self):
+        return f"{self.get_transaction_type_display()} {self.amount} €"
+
+
+class ShiftClose(models.Model):
+    cashier = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Касиер")
+    closed_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата на приключване")
+    sales_total = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Оборот")
+    cash_total = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="В брой")
+    card_total = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="С карта")
+    cash_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Наличност каса")
+    attendance = models.IntegerField(default=0, verbose_name="Посещаемост")
+    comment = models.CharField(max_length=200, blank=True, default='', verbose_name="Коментар")
+
+    def __str__(self):
+        return f"Приключване #{self.id} - {self.closed_at.strftime('%d.%m.%Y %H:%M')}"

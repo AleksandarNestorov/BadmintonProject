@@ -73,6 +73,7 @@
         .main-workspace {
             flex-grow: 1;
             padding: 15px;
+            padding-right: 390px;
             display: block;
             overflow: hidden;
         }
@@ -328,6 +329,130 @@
             background: #e5e7eb;
             color: #6b7280;
         }
+        .bill-sidebar {
+            position: fixed;
+            top: 129px;
+            right: 15px;
+            bottom: 15px;
+            width: 360px;
+            z-index: 30;
+        }
+        .bill-panel {
+            height: 100%;
+        }
+        .bill-items {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .bill-item {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 10px;
+            background: #fff;
+        }
+        .bill-item-name {
+            color: #1e293b;
+            font-size: 0.9rem;
+            font-weight: 800;
+            line-height: 1.25;
+        }
+        .bill-item-meta {
+            color: #64748b;
+            font-size: 0.78rem;
+            font-weight: 700;
+        }
+        .bill-qty-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .bill-total {
+            background: #0f172a;
+            color: #fff;
+            padding: 14px;
+            border-radius: 10px;
+        }
+        .bill-total-label {
+            color: #cbd5e1;
+            font-size: 0.78rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .bill-total-value {
+            font-family: Consolas, monospace;
+            font-size: 1.8rem;
+            font-weight: 900;
+            line-height: 1;
+        }
+        .bill-actions {
+            border-top: 1px solid #e2e8f0;
+            padding: 12px;
+            background: #f8fafc;
+        }
+        .cashier-menu {
+            background: #111827;
+            border: 1px solid rgba(255,255,255,0.08);
+            min-width: 340px;
+            padding: 0;
+            box-shadow: 0 18px 45px rgba(0,0,0,0.35);
+        }
+        .cashier-menu-header {
+            background: #243244;
+            color: #fff;
+            padding: 12px 14px;
+        }
+        .cashier-metric {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 9px 14px;
+            color: #e5e7eb;
+            font-weight: 800;
+        }
+        .cashier-metric span:first-child {
+            color: #cbd5e1;
+        }
+        .cashier-menu .dropdown-item {
+            color: #e5e7eb;
+            padding: 10px 14px;
+            font-weight: 700;
+        }
+        .cashier-menu .dropdown-item:hover {
+            background: #32a6b8;
+            color: #fff;
+        }
+        .report-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px;
+            background: #fff;
+            height: 100%;
+        }
+        .report-label {
+            color: #64748b;
+            font-size: 0.78rem;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+        .report-value {
+            color: #0f172a;
+            font-family: Consolas, monospace;
+            font-size: 1.55rem;
+            font-weight: 900;
+        }
+        @media (max-width: 1199.98px) {
+            .main-workspace {
+                padding-right: 15px;
+            }
+            .bill-sidebar {
+                display: none;
+            }
+        }
         
         /* 7. ТЪРСАЧКА */
         .search-container { position: relative; margin-bottom: 15px; }
@@ -361,10 +486,46 @@
     </div>
     
     <div class="d-flex align-items-center gap-3">
-        <div class="cashier-info">
-            <i class="fas fa-user-circle me-1"></i> {{ user.get_full_name|default:user.username }}
+        <div class="dropdown">
+            <button class="cashier-info border-0 text-white dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-user-circle me-1"></i> {{ user.get_full_name|default:user.username }}
+            </button>
+            <div class="dropdown-menu dropdown-menu-end cashier-menu">
+                <div class="cashier-menu-header">
+                    <div class="fw-bold">{{ user.get_full_name|default:user.username }}</div>
+                    <div class="small text-white-50">Отчети и каса</div>
+                </div>
+                <div class="cashier-metric">
+                    <span><i class="fas fa-money-bill-wave me-2"></i>Наличност каса</span>
+                    <span>{{ cash_balance }} €</span>
+                </div>
+                <div class="cashier-metric">
+                    <span><i class="fas fa-credit-card me-2"></i>Продажби с карта</span>
+                    <span>{{ current_card_sales_total }} €</span>
+                </div>
+                <div class="dropdown-divider border-secondary my-0"></div>
+                <button class="dropdown-item reset-report-btn" type="button" data-bs-toggle="modal" data-bs-target="#reportsModal" data-report-url="{% url 'reception' %}?open_report=daily">
+                    <i class="fas fa-calendar-day me-2"></i> Дневен отчет
+                </button>
+                <button class="dropdown-item reset-report-btn" type="button" data-bs-toggle="modal" data-bs-target="#monthlyReportModal" data-report-url="{% url 'reception' %}?open_report=monthly">
+                    <i class="fas fa-calendar-alt me-2"></i> Месечен отчет
+                </button>
+                <button class="dropdown-item reset-report-btn" type="button" data-bs-toggle="modal" data-bs-target="#yearlyReportModal" data-report-url="{% url 'reception' %}?open_report=yearly">
+                    <i class="fas fa-calendar-check me-2"></i> Годишен отчет
+                </button>
+                <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#cashModal">
+                    <i class="fas fa-cash-register me-2"></i> Касови транзакции
+                </button>
+                <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#cashAdjustModal">
+                    <i class="fas fa-plus-minus me-2"></i> Добави/извади от каса
+                </button>
+                <div class="dropdown-divider border-secondary my-0"></div>
+                <button class="dropdown-item text-warning" type="button" data-bs-toggle="modal" data-bs-target="#closeDayModal">
+                    <i class="fas fa-lock me-2"></i> Приключване на деня
+                </button>
+            </div>
         </div>
-        <a href="{% url 'home' %}" class="btn btn-outline-light btn-sm rounded-pill px-3">
+        <a href="{% url 'reception_exit' %}" class="btn btn-outline-light btn-sm rounded-pill px-3">
             <i class="fas fa-sign-out-alt"></i> Изход
         </a>
     </div>
@@ -458,9 +619,10 @@
                             <td class="price-tag">{{ product.price }} €</td>
                             <td class="text-end pe-3">
                                 {% if product.quantity is None or product.quantity > 0 %}
-                                    <form action="{% url 'sell_product' product.id %}" method="post">
+                                    <form action="{% url 'add_to_bill' product.id %}" method="post">
                                         {% csrf_token %}
-                                        <button type="submit" class="btn btn-sm btn-primary rounded-circle" title="Продай 1 бр.">
+                                        <input type="hidden" name="active_tab" value="products" class="active-tab-input">
+                                        <button type="submit" class="btn btn-sm btn-primary rounded-circle" title="Добави в сметка">
                                             <i class="fas fa-plus"></i>
                                         </button>
                                     </form>
@@ -536,9 +698,10 @@
                             <td class="text-muted">{{ service.get_category_display }}</td>
                             <td class="service-price">{{ service.price }} €</td>
                             <td class="text-end pe-3">
-                                <form action="{% url 'sell_product' service.id %}" method="post">
+                                <form action="{% url 'add_to_bill' service.id %}" method="post">
                                     {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-primary rounded-circle" title="Добави услуга">
+                                    <input type="hidden" name="active_tab" value="visits" class="active-tab-input">
+                                    <button type="submit" class="btn btn-sm btn-primary rounded-circle" title="Добави в сметка">
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 </form>
@@ -718,6 +881,492 @@
     </div>
 </div>
 
+<aside class="bill-sidebar">
+    <div class="panel bill-panel">
+        <div class="panel-header">
+            <span><i class="fas fa-receipt me-2"></i> Текуща сметка</span>
+            <span class="badge bg-dark rounded-pill">{{ bill_count }} бр.</span>
+        </div>
+
+        <div class="panel-body">
+            {% if bill_items %}
+                <div class="bill-items">
+                    {% for item in bill_items %}
+                    <div class="bill-item">
+                        <div class="d-flex justify-content-between gap-2 mb-2">
+                            <div>
+                                <div class="bill-item-name">{{ item.product.name }}</div>
+                                <div class="bill-item-meta">{{ item.product.get_category_display }} · {{ item.product.price }} €</div>
+                            </div>
+                            <form action="{% url 'remove_bill_item' item.product.id %}" method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="active_tab" value="products" class="active-tab-input">
+                                <button type="submit" class="btn btn-sm btn-light text-danger rounded-circle" title="Премахни реда">
+                                    <i class="fas fa-xmark"></i>
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-2">
+                                <form action="{% url 'decrease_bill_item' item.product.id %}" method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="active_tab" value="products" class="active-tab-input">
+                                    <button type="submit" class="btn btn-outline-secondary btn-sm bill-qty-btn" title="Намали">
+                                        <i class="fas fa-minus"></i>
+                                    </button>
+                                </form>
+                                <span class="fw-bold">{{ item.quantity }}</span>
+                                <form action="{% url 'add_to_bill' item.product.id %}" method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="active_tab" value="products" class="active-tab-input">
+                                    <button type="submit" class="btn btn-outline-primary btn-sm bill-qty-btn" title="Добави още">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </form>
+                            </div>
+                            <div class="price-tag">{{ item.line_total }} €</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="fas fa-receipt fa-2x mb-3"></i>
+                    <div class="fw-bold">Сметката е празна</div>
+                    <div class="small">Добавяйте продукти и услуги с бутона плюс.</div>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="bill-actions">
+            <div class="bill-total mb-3">
+                <div class="bill-total-label">Дължима сума</div>
+                <div class="bill-total-value">{{ bill_total }} €</div>
+            </div>
+
+            <div class="d-grid gap-2">
+                <form action="{% url 'checkout_bill' %}" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="active_tab" value="products" class="active-tab-input">
+                    <input type="hidden" name="payment_method" value="cash">
+                    <button type="submit" class="btn btn-success w-100 fw-bold" {% if not bill_items %}disabled{% endif %}>
+                        <i class="fas fa-money-bill-wave me-1"></i> Плати в брой
+                    </button>
+                </form>
+                <form action="{% url 'checkout_bill' %}" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="active_tab" value="products" class="active-tab-input">
+                    <input type="hidden" name="payment_method" value="card">
+                    <button type="submit" class="btn btn-primary w-100 fw-bold" {% if not bill_items %}disabled{% endif %}>
+                        <i class="fas fa-credit-card me-1"></i> Плати с карта
+                    </button>
+                </form>
+                <form action="{% url 'clear_bill' %}" method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="active_tab" value="products" class="active-tab-input">
+                    <button type="submit" class="btn btn-outline-secondary w-100" {% if not bill_items %}disabled{% endif %}>
+                        Изчисти сметката
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</aside>
+
+<div class="modal fade" id="reportsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-calendar-day me-2"></i> Дневен отчет</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <form method="get" action="{% url 'reception' %}" class="row g-2 align-items-end mb-3">
+                    <input type="hidden" name="open_report" value="daily">
+                    <input type="hidden" name="report_month" value="{{ selected_month_value }}">
+                    <input type="hidden" name="report_year" value="{{ selected_year }}">
+                    <div class="col">
+                        <label class="form-label fw-bold">Избери ден</label>
+                        <input type="date" name="report_date" class="form-control" value="{{ selected_day_value }}">
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary fw-bold">Покажи</button>
+                    </div>
+                </form>
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3">
+                        <div class="report-card">
+                            <div class="report-label">Оборот за {{ selected_day_label }}</div>
+                            <div class="report-value">{{ today_sales_total }} €</div>
+                            <div class="small text-muted">{{ today_sales_count }} продажби</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="report-card">
+                            <div class="report-label">В брой</div>
+                            <div class="report-value">{{ today_cash_sales_total }} €</div>
+                            <div class="small text-muted">Влиза в касата</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="report-card">
+                            <div class="report-label">С карта</div>
+                            <div class="report-value">{{ today_card_sales_total }} €</div>
+                            <div class="small text-muted">Не влиза в касата</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="report-card">
+                            <div class="report-label">Наличност каса</div>
+                            <div class="report-value">{{ daily_cash_balance }} €</div>
+                            <div class="small text-muted">Касови движения за избрания ден</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="report-card">
+                            <div class="report-label">Посещаемост</div>
+                            <div class="report-value">{{ today_attendance }}</div>
+                            <div class="small text-muted">Игри и тренировки за деня</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+                        <span>Последни 5 покупки за {{ selected_day_label }}</span>
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#dailySalesModal" {% if not daily_sales_has_more %}disabled{% endif %}>
+                            Виж всички
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Плащане</th>
+                                    <th>Артикули</th>
+                                    <th class="text-end">Сума</th>
+                                    <th class="text-end">Действие</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sale in recent_sales %}
+                                <tr>
+                                    <td>{{ sale.created_at|date:"d.m.Y H:i" }}</td>
+                                    <td>{{ sale.get_payment_method_display }}</td>
+                                    <td>
+                                        {% for item in sale.saleitem_set.all %}
+                                            <span class="badge bg-light text-dark border me-1">
+                                                {% if item.product %}{{ item.product.name }}{% else %}Изтрит продукт{% endif %} x{{ item.quantity }}
+                                            </span>
+                                        {% endfor %}
+                                    </td>
+                                    <td class="text-end fw-bold">{{ sale.total_amount }} €</td>
+                                    <td class="text-end">
+                                        {% if sale.created_at >= current_shift_start %}
+                                            <form action="{% url 'void_sale' sale.id %}" method="post">
+                                                {% csrf_token %}
+                                                <input type="hidden" name="report_date" value="{{ selected_day_value }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill" onclick="return confirm('Сигурни ли сте, че искате да направите сторно?')">
+                                                    Сторно
+                                                </button>
+                                            </form>
+                                        {% else %}
+                                            <span class="text-muted small">-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="5" class="text-center text-muted py-4">Все още няма продажби.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm mt-3">
+                    <div class="card-header fw-bold">Приключвания за {{ selected_day_label }}</div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Каса</th>
+                                    <th>Оборот</th>
+                                    <th>Посещаемост</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for shift_close in recent_shift_closes %}
+                                <tr>
+                                    <td>{{ shift_close.closed_at|date:"d.m.Y H:i" }}</td>
+                                    <td>{{ shift_close.cash_balance }} €</td>
+                                    <td>{{ shift_close.sales_total }} €</td>
+                                    <td>{{ shift_close.attendance }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="4" class="text-center text-muted py-4">Все още няма приключени дни.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="dailySalesModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-list me-2"></i> Всички продажби за деня</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Плащане</th>
+                                <th>Артикули</th>
+                                <th class="text-end">Сума</th>
+                                <th class="text-end">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sale in daily_sales %}
+                            <tr>
+                                <td>{{ sale.created_at|date:"d.m.Y H:i" }}</td>
+                                <td>{{ sale.get_payment_method_display }}</td>
+                                <td>
+                                    {% for item in sale.saleitem_set.all %}
+                                        <span class="badge bg-light text-dark border me-1">
+                                            {% if item.product %}{{ item.product.name }}{% else %}Изтрит продукт{% endif %} x{{ item.quantity }}
+                                        </span>
+                                    {% endfor %}
+                                </td>
+                                <td class="text-end fw-bold">{{ sale.total_amount }} €</td>
+                                <td class="text-end">
+                                    {% if sale.created_at >= current_shift_start %}
+                                        <form action="{% url 'void_sale' sale.id %}" method="post">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="report_date" value="{{ selected_day_value }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill" onclick="return confirm('Сигурни ли сте, че искате да направите сторно?')">
+                                                Сторно
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <span class="text-muted small">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="text-center text-muted py-4">Няма продажби за деня.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="monthlyReportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-calendar-alt me-2"></i> Месечен отчет</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <form method="get" action="{% url 'reception' %}" class="row g-2 align-items-end mb-3">
+                    <input type="hidden" name="open_report" value="monthly">
+                    <input type="hidden" name="report_date" value="{{ selected_day_value }}">
+                    <input type="hidden" name="report_year" value="{{ selected_year }}">
+                    <div class="col">
+                        <label class="form-label fw-bold">Избери месец</label>
+                        <input type="month" name="report_month" class="form-control" value="{{ selected_month_value }}">
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary fw-bold">Покажи</button>
+                    </div>
+                </form>
+                <div class="report-card mb-3">
+                    <div class="report-label">Оборот за {{ selected_month_label }}</div>
+                    <div class="report-value">{{ month_sales_total }} €</div>
+                    <div class="small text-muted">{{ month_sales_count }} продажби</div>
+                </div>
+                <div class="report-card mb-3">
+                    <div class="report-label">Посещаемост за {{ selected_month_label }}</div>
+                    <div class="report-value">{{ month_attendance }}</div>
+                    <div class="small text-muted">Игри и тренировки за избрания месец</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="yearlyReportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-calendar-check me-2"></i> Годишен отчет</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <form method="get" action="{% url 'reception' %}" class="row g-2 align-items-end mb-3">
+                    <input type="hidden" name="open_report" value="yearly">
+                    <input type="hidden" name="report_date" value="{{ selected_day_value }}">
+                    <input type="hidden" name="report_month" value="{{ selected_month_value }}">
+                    <div class="col">
+                        <label class="form-label fw-bold">Избери година</label>
+                        <select name="report_year" class="form-select">
+                            {% for year in report_years %}
+                                <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary fw-bold">Покажи</button>
+                    </div>
+                </form>
+                <div class="report-card mb-3">
+                    <div class="report-label">Оборот за {{ selected_year }} г.</div>
+                    <div class="report-value">{{ year_sales_total }} €</div>
+                    <div class="small text-muted">{{ year_sales_count }} продажби</div>
+                </div>
+                <div class="report-card mb-3">
+                    <div class="report-label">Посещаемост за {{ selected_year }} г.</div>
+                    <div class="report-value">{{ year_attendance }}</div>
+                    <div class="small text-muted">Игри и тренировки за избраната година</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cashModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-cash-register me-2"></i> Касови транзакции</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-3">
+                    Наличност каса за днес: <strong>{{ cash_balance }} €</strong>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Час</th>
+                                <th>Тип</th>
+                                <th>Коментар</th>
+                                <th class="text-end">Сума</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cash_transaction in cash_transactions %}
+                            <tr>
+                                <td>{{ cash_transaction.created_at|date:"H:i" }}</td>
+                                <td>{{ cash_transaction.get_transaction_type_display }}</td>
+                                <td>{{ cash_transaction.comment|default:"-" }}</td>
+                                <td class="text-end fw-bold">{{ cash_transaction.amount }} €</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="text-center text-muted py-4">Няма касови движения за днес.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cashAdjustModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-plus-minus me-2"></i> Добави/извади от каса</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{% url 'add_cash_transaction' %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="active_tab" value="products" class="active-tab-input">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Тип операция</label>
+                        <select name="transaction_type" class="form-select" required>
+                            <option value="in">Добавяне в каса</option>
+                            <option value="out">Изваждане от каса</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Сума</label>
+                        <input type="number" name="amount" class="form-control" min="0.01" step="0.01" placeholder="50.00" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Коментар</label>
+                        <input type="text" name="comment" class="form-control" placeholder="Например: Начало на деня или доставка">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отказ</button>
+                    <button type="submit" class="btn btn-primary fw-bold">Запиши операция</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="closeDayModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-lock me-2"></i> Приключване на деня</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{% url 'close_day' %}" method="post">
+                {% csrf_token %}
+                <input type="hidden" name="active_tab" value="products" class="active-tab-input">
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        Това ще приключи текущата смяна и ще нулира дневния отчет и наличността в касата за следващата смяна.
+                        Историята остава запазена в месечните и годишните отчети.
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <div class="report-card">
+                                <div class="report-label">Каса</div>
+                                <div class="report-value">{{ cash_balance }} €</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="report-card">
+                                <div class="report-label">Оборот</div>
+                                <div class="report-value">{{ current_sales_total }} €</div>
+                            </div>
+                        </div>
+                    </div>
+                    <label class="form-label fw-bold">Коментар</label>
+                    <input type="text" name="comment" class="form-control" value="Приключване на деня">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отказ</button>
+                    <button type="submit" class="btn btn-warning fw-bold" onclick="return confirm('Сигурни ли сте, че искате да приключите деня?')">
+                        Приключи деня
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     function activatePosTab(tabName) {
@@ -728,17 +1377,70 @@
         document.querySelectorAll('.pos-tab-pane').forEach(function(pane) {
             pane.classList.toggle('active', pane.id === 'tab-' + tabName);
         });
+
+        document.querySelectorAll('.active-tab-input').forEach(function(input) {
+            input.value = tabName;
+        });
     }
 
     document.querySelectorAll('.pos-tab').forEach(function(tab) {
         tab.addEventListener('click', function() {
             activatePosTab(tab.dataset.tab);
+            var url = new URL(window.location.href);
+            url.searchParams.set('tab', tab.dataset.tab);
+            if (tab.dataset.tab !== 'schedule') {
+                url.searchParams.delete('q');
+            }
+            window.history.replaceState({}, '', url);
+        });
+    });
+
+    document.querySelectorAll('.reset-report-btn').forEach(function(button) {
+        button.addEventListener('click', function(event) {
+            var currentUrl = new URL(window.location.href);
+            var hasSelectedReportPeriod = (
+                currentUrl.searchParams.has('report_date') ||
+                currentUrl.searchParams.has('report_month') ||
+                currentUrl.searchParams.has('report_year')
+            );
+
+            if (hasSelectedReportPeriod) {
+                event.preventDefault();
+                event.stopPropagation();
+                window.location.href = button.dataset.reportUrl;
+            }
         });
     });
 
     var params = new URLSearchParams(window.location.search);
-    if (params.get('tab') === 'schedule' || params.has('q')) {
+    if (params.get('tab')) {
+        activatePosTab(params.get('tab'));
+    } else if (params.has('q')) {
         activatePosTab('schedule');
+    }
+
+    if (params.get('open_report') === 'daily') {
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('reportsModal')).show();
+        params.delete('open_report');
+        var dailyUrl = new URL(window.location.href);
+        dailyUrl.searchParams.delete('open_report');
+        window.history.replaceState({}, '', dailyUrl);
+    }
+
+    if (params.get('open_report') === 'monthly') {
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('monthlyReportModal')).show();
+        params.delete('open_report');
+        var monthlyUrl = new URL(window.location.href);
+        monthlyUrl.searchParams.delete('open_report');
+        window.history.replaceState({}, '', monthlyUrl);
+    }
+
+    if (params.get('open_report') === 'yearly') {
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('yearlyReportModal')).show();
+        params.delete('open_report');
+        var yearlyUrl = new URL(window.location.href);
+        yearlyUrl.searchParams.delete('open_report');
+        window.history.replaceState({}, '', yearlyUrl);
     }
 
     var productSearch = document.getElementById('productSearch');
