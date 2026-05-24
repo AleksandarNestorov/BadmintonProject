@@ -1,0 +1,196 @@
+:root {
+    --primary: #0f172a;
+    --secondary: #1e293b;
+    --accent: #ffc107;
+    --primary-fg: #ffffff;
+    --body-bg: #f4f6f9;
+    --body-fg: #111827;
+    --body-quiet-color: #64748b;
+    --link-fg: #1f3a5f;
+    --link-hover-color: #ff5a1f;
+    --header-color: #ffffff;
+    --header-branding-color: #ffffff;
+    --header-bg: #0f172a;
+    --header-link-color: #cbd5e1;
+    --breadcrumbs-bg: #1e293b;
+    --breadcrumbs-fg: #cbd5e1;
+    --button-bg: #ffc107;
+    --button-fg: #111827;
+    --button-hover-bg: #ffca2c;
+    --default-button-bg: #ffc107;
+    --default-button-hover-bg: #ffca2c;
+    --delete-button-bg: #dc3545;
+    --delete-button-hover-bg: #bb2d3b;
+}
+
+body {
+    background:
+        linear-gradient(135deg, rgba(255, 193, 7, 0.08), rgba(255, 255, 255, 0.9)),
+        var(--body-bg);
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+#header {
+    background: var(--header-bg);
+    border-bottom: 4px solid var(--accent);
+    box-shadow: 0 0.75rem 1.75rem rgba(0, 0, 0, 0.18);
+}
+
+#branding h1,
+#branding h1 a,
+#site-name,
+#site-name a {
+    color: #fff;
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+#site-name a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-decoration: none;
+}
+
+.admin-brand-mark {
+    display: inline-block;
+    width: 10px;
+    height: 34px;
+    background: var(--accent);
+    border-radius: 2px;
+}
+
+#user-tools,
+#user-tools a {
+    color: #cbd5e1;
+    font-weight: 700;
+}
+
+#user-tools a:hover {
+    color: var(--accent);
+}
+
+div.breadcrumbs {
+    background: var(--secondary);
+    color: #cbd5e1;
+    border: 0;
+}
+
+div.breadcrumbs a {
+    color: var(--accent);
+    font-weight: 800;
+}
+
+.module {
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 0.75rem 1.5rem rgba(15, 23, 42, 0.06);
+    overflow: hidden;
+}
+
+.module h2,
+.module caption,
+.inline-group h2 {
+    background: var(--primary);
+    color: #fff;
+    border-bottom: 3px solid var(--accent);
+    font-weight: 900;
+    letter-spacing: 0.02rem;
+    text-transform: uppercase;
+}
+
+#content h1 {
+    color: #1f3a5f;
+    font-weight: 900;
+}
+
+a:link,
+a:visited {
+    color: var(--link-fg);
+    font-weight: 700;
+}
+
+a:hover {
+    color: var(--link-hover-color);
+}
+
+input,
+textarea,
+select,
+.vTextField {
+    border-radius: 6px;
+    border-color: #d7dee8;
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+.vTextField:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 0.22rem rgba(255, 193, 7, 0.24);
+}
+
+.button,
+input[type=submit],
+input[type=button],
+.submit-row input,
+a.button {
+    background: var(--button-bg);
+    color: var(--button-fg);
+    border-radius: 6px;
+    border: 0;
+    font-weight: 900;
+}
+
+.button:hover,
+input[type=submit]:hover,
+input[type=button]:hover,
+.submit-row input:hover,
+a.button:hover {
+    background: var(--button-hover-bg);
+    color: var(--button-fg);
+}
+
+.button.default,
+input[type=submit].default,
+.submit-row input.default {
+    background: var(--default-button-bg);
+    color: #111827;
+}
+
+.button.default:hover,
+input[type=submit].default:hover,
+.submit-row input.default:hover {
+    background: var(--default-button-hover-bg);
+}
+
+.object-tools a,
+.object-tools a:link,
+.object-tools a:visited {
+    background: var(--primary);
+    border-radius: 6px;
+    font-weight: 900;
+}
+
+.object-tools a:hover {
+    background: var(--secondary);
+}
+
+table thead th {
+    background: #f8fafc;
+    color: #334155;
+    font-weight: 900;
+}
+
+tr:nth-child(odd),
+.row-form-errors {
+    background: #fbfdff;
+}
+
+tr:nth-child(even),
+tr:nth-child(even) .errorlist,
+tr:nth-child(odd) + .row-form-errors,
+tr:nth-child(odd) + .row-form-errors .errorlist {
+    background: #fff;
+}

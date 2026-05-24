@@ -1,0 +1,200 @@
+:root {
+    --site-navy: #0f172a;
+    --site-navy-soft: #1e293b;
+    --site-yellow: #ffc107;
+    --site-yellow-hover: #ffca2c;
+    --site-orange: #ff5a1f;
+    --site-border: rgba(15, 23, 42, 0.1);
+    --site-muted: #64748b;
+    --site-surface: #ffffff;
+    --site-page: #f4f6f9;
+}
+
+body.app-page {
+    background:
+        linear-gradient(135deg, rgba(255, 193, 7, 0.08), rgba(255, 255, 255, 0.9)),
+        var(--site-page);
+    color: #111827;
+    min-height: 100vh;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.site-navbar {
+    background: rgba(15, 23, 42, 0.96);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0.75rem 1.75rem rgba(0, 0, 0, 0.18);
+}
+
+.site-navbar .navbar-brand {
+    color: #fff;
+    font-weight: 900;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.brand-mark {
+    display: inline-block;
+    width: 10px;
+    height: 34px;
+    background: var(--site-yellow);
+    border-radius: 2px;
+    margin-right: 0.75rem;
+    vertical-align: middle;
+}
+
+.site-navbar .nav-link,
+.site-navbar .navbar-text {
+    color: rgba(255, 255, 255, 0.78);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.82rem;
+    letter-spacing: 0.03rem;
+}
+
+.site-navbar .nav-link:hover,
+.site-navbar .navbar-text strong {
+    color: var(--site-yellow);
+}
+
+.page-shell {
+    padding-top: 2.5rem;
+    padding-bottom: 4rem;
+}
+
+.auth-shell {
+    max-width: 520px;
+}
+
+.register-shell {
+    max-width: 680px;
+}
+
+.app-card {
+    background: var(--site-surface);
+    border: 1px solid var(--site-border);
+    border-radius: 8px;
+    box-shadow: 0 0.9rem 2rem rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+}
+
+.app-card-header {
+    background: var(--site-navy);
+    color: #fff;
+    border-bottom: 4px solid var(--site-yellow);
+    padding: 1.1rem 1.25rem;
+}
+
+.app-card-title {
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.02rem;
+    margin: 0;
+}
+
+.app-card-footer {
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+}
+
+.section-kicker {
+    color: var(--site-orange);
+    font-size: 0.78rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.08rem;
+}
+
+.page-title {
+    color: #1f3a5f;
+    font-weight: 900;
+    letter-spacing: 0;
+}
+
+.form-label {
+    color: #334155;
+    font-weight: 800;
+}
+
+.form-control,
+.form-select {
+    border-color: #d7dee8;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--site-yellow);
+    box-shadow: 0 0 0 0.22rem rgba(255, 193, 7, 0.24);
+}
+
+.btn-brand {
+    background: var(--site-yellow);
+    border-color: var(--site-yellow);
+    color: #111827;
+    font-weight: 900;
+}
+
+.btn-brand:hover,
+.btn-brand:focus {
+    background: var(--site-yellow-hover);
+    border-color: var(--site-yellow-hover);
+    color: #111827;
+}
+
+.btn-navy {
+    background: var(--site-navy);
+    border-color: var(--site-navy);
+    color: #fff;
+    font-weight: 800;
+}
+
+.btn-navy:hover,
+.btn-navy:focus {
+    background: var(--site-navy-soft);
+    border-color: var(--site-navy-soft);
+    color: #fff;
+}
+
+.btn-outline-navy {
+    border-color: var(--site-navy);
+    color: var(--site-navy);
+    font-weight: 800;
+}
+
+.btn-outline-navy:hover,
+.btn-outline-navy:focus {
+    background: var(--site-navy);
+    color: #fff;
+}
+
+.data-table thead th {
+    background: var(--site-navy);
+    color: #fff;
+    border-color: var(--site-navy);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03rem;
+}
+
+.soft-panel {
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid var(--site-border);
+    border-radius: 8px;
+    box-shadow: 0 0.75rem 1.5rem rgba(15, 23, 42, 0.06);
+}
+
+.status-pill {
+    border-radius: 999px;
+    font-weight: 800;
+    padding: 0.4rem 0.7rem;
+}
+
+.site-link {
+    color: #1f3a5f;
+    font-weight: 800;
+}
+
+.site-link:hover {
+    color: var(--site-orange);
+}

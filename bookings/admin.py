@@ -1,6 +1,10 @@
 from django.contrib import admin
 from .models import User, Court, Booking, Product, TrainerProfile, Sale, SaleItem, CashTransaction, ShiftClose
 
+admin.site.site_header = "Бадминтон зала Юнак"
+admin.site.site_title = "Бадминтон зала Юнак"
+admin.site.index_title = "Административен панел"
+
 admin.site.register(User)
 admin.site.register(Court)
 admin.site.register(Booking)

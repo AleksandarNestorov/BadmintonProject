@@ -2,14 +2,19 @@
 <html lang="bg">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>POS Терминал - Бадминтон</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    {% load static %}
+    <link href="{% static 'css/site-ui.css' %}" rel="stylesheet">
     
     <style>
         /* 1. ГЛОБАЛНИ НАСТРОЙКИ ЗА APP УСЕЩАНЕ */
         body {
-            background-color: #eef2f6;
+            background:
+                linear-gradient(135deg, rgba(255, 193, 7, 0.08), rgba(255, 255, 255, 0.9)),
+                #eef2f6;
             height: 100vh; /* Цял екран */
             overflow: hidden; /* Без скрол на цялата страница */
             display: flex;
@@ -19,7 +24,7 @@
 
         /* 2. ГОРНА ЛЕНТА (HEADER) */
         .app-header {
-            background: #1e293b; /* Тъмно синьо-сиво */
+            background: #0f172a; /* Тъмно синьо-сиво */
             color: white;
             padding: 0 20px;
             height: 60px;
@@ -35,7 +40,7 @@
         /* 2.1 POS НАВИГАЦИЯ ПО СЕКЦИИ */
         .pos-tabs {
             height: 54px;
-            background: #2f353d;
+            background: #1e293b;
             display: flex;
             align-items: stretch;
             padding: 0 16px;
@@ -62,8 +67,8 @@
             color: #fff;
         }
         .pos-tab.active {
-            background: #32a6b8;
-            color: #fff;
+            background: #ffc107;
+            color: #111827;
         }
         .pos-tab i {
             font-size: 1rem;
@@ -113,7 +118,7 @@
         /* 4. КАРТИ / ПАНЕЛИ */
         .panel {
             background: white;
-            border-radius: 12px;
+            border-radius: 8px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             display: flex;
             flex-direction: column;
@@ -208,7 +213,7 @@
         }
         .price-tag { font-family: 'Consolas', monospace; font-weight: bold; color: #334155; }
         .inventory-toolbar {
-            background: #343a40;
+            background: #0f172a;
             padding: 10px;
             display: flex;
             gap: 10px;
@@ -219,7 +224,7 @@
             flex: 1;
         }
         .inventory-search input {
-            background: #32a6b8;
+            background: #ffc107;
             border: 0;
             color: #fff;
             font-weight: 700;
@@ -228,7 +233,7 @@
         .inventory-search input:focus {
             background: #fff;
             color: #1e293b;
-            box-shadow: 0 0 0 3px rgba(50, 166, 184, 0.28);
+            box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.24);
             padding-left: 38px;
         }
         .inventory-search input::placeholder {
@@ -247,7 +252,7 @@
             z-index: 2;
         }
         .inventory-search:focus-within i {
-            color: #32a6b8;
+            color: #ffc107;
         }
         .toolbar-filter {
             background: #444b55;
@@ -271,7 +276,8 @@
             font-size: 0.9rem;
         }
         .sort-dropdown .dropdown-item.active {
-            background: #32a6b8;
+            background: #ffc107;
+            color: #111827;
             color: #fff;
             font-weight: 800;
         }
@@ -285,14 +291,14 @@
             white-space: nowrap;
         }
         .toolbar-view-btn {
-            background: #32a6b8;
-            color: #fff;
+            background: #ffc107;
+            color: #111827;
             border: 0;
             width: 38px;
         }
         .reception-schedule {
             border: 1px solid #e2e8f0;
-            border-radius: 10px;
+            border-radius: 8px;
             overflow: hidden;
             margin-bottom: 16px;
         }
