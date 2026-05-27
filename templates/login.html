@@ -54,6 +54,9 @@
                             <input type="password" name="password" class="form-control" required autocomplete="current-password">
                             <div class="invalid-feedback">Моля, въведете парола.</div>
                         </div>
+                        <div class="d-flex justify-content-end mb-3">
+                            <a href="{% url 'password_reset' %}" class="site-link small">Забравена парола?</a>
+                        </div>
                         
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-brand btn-lg">Влез</button>

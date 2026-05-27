@@ -796,6 +796,7 @@
                                             {% csrf_token %}
                                             <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}">
                                             <input type="hidden" name="customer_id" value="{{ u.id }}">
+                                            <input type="hidden" name="active_tab" value="schedule">
                                             <div class="mb-2">
                                                 <label class="small text-muted">Корт</label>
                                                 <select name="court_id" class="form-select">
@@ -806,10 +807,22 @@
                                             </div>
                                             <div class="mb-3">
                                                 <label class="small text-muted">Час</label>
-                                                <select name="hour" class="form-select">
+                                                <select name="hour" class="form-select reception-hour-select" id="receptionHour{{ u.id }}" data-user-id="{{ u.id }}">
                                                     {% for h in hours_range %}
                                                         <option value="{{ h }}">{{ h }}:00</option>
                                                     {% endfor %}
+                                                </select>
+                                            </div>
+                                            <div class="mb-3 d-none" id="receptionTrainerWrap{{ u.id }}">
+                                                <label class="small text-muted">Треньор</label>
+                                                <select name="trainer_id" class="form-select reception-trainer-select" id="receptionTrainer{{ u.id }}" data-user-id="{{ u.id }}">
+                                                    <option value="">Само корт</option>
+                                                </select>
+                                            </div>
+                                            <div class="mb-3 d-none" id="receptionTrainingTypeWrap{{ u.id }}">
+                                                <label class="small text-muted">Вид тренировка</label>
+                                                <select name="training_type" class="form-select reception-training-type-select" id="receptionTrainingType{{ u.id }}" data-user-id="{{ u.id }}">
+                                                    <option value="">Изберете вид</option>
                                                 </select>
                                             </div>
                                             <button type="submit" class="btn btn-primary w-100">Запази</button>
@@ -916,6 +929,11 @@
                             <div class="small text-muted">
                                 <i class="far fa-user me-1"></i> {{ b.customer.get_full_name }}
                             </div>
+                            {% if b.trainer %}
+                                <div class="small text-muted">
+                                    <i class="fas fa-user-tie me-1"></i> {{ b.trainer.get_full_name }} · {{ b.get_training_type_display }}
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
 
@@ -1752,6 +1770,77 @@
         });
     }
 
+    const receptionTrainerOptionsByHour = JSON.parse('{{ schedule_trainer_options_json|escapejs }}');
+
+    function fillReceptionTrainingTypes(userId) {
+        var hourSelect = document.getElementById('receptionHour' + userId);
+        var trainerSelect = document.getElementById('receptionTrainer' + userId);
+        var trainingTypeWrap = document.getElementById('receptionTrainingTypeWrap' + userId);
+        var trainingTypeSelect = document.getElementById('receptionTrainingType' + userId);
+
+        if (!hourSelect || !trainerSelect || !trainingTypeWrap || !trainingTypeSelect) {
+            return;
+        }
+
+        var trainerId = trainerSelect.value;
+        var options = receptionTrainerOptionsByHour[String(hourSelect.value)] || [];
+        trainingTypeSelect.innerHTML = '<option value="">Изберете вид</option>';
+
+        if (!trainerId) {
+            trainingTypeWrap.classList.add('d-none');
+            return;
+        }
+
+        var selectedTrainer = options.find(function(option) {
+            return String(option.id) === String(trainerId);
+        });
+
+        if (!selectedTrainer) {
+            trainingTypeWrap.classList.add('d-none');
+            return;
+        }
+
+        selectedTrainer.training_types.forEach(function(type) {
+            var option = document.createElement('option');
+            option.value = type.value;
+            option.textContent = type.label;
+            trainingTypeSelect.appendChild(option);
+        });
+
+        trainingTypeWrap.classList.remove('d-none');
+    }
+
+    function updateReceptionTrainerOptions(userId) {
+        var hourSelect = document.getElementById('receptionHour' + userId);
+        var trainerWrap = document.getElementById('receptionTrainerWrap' + userId);
+        var trainerSelect = document.getElementById('receptionTrainer' + userId);
+        var trainingTypeWrap = document.getElementById('receptionTrainingTypeWrap' + userId);
+        var trainingTypeSelect = document.getElementById('receptionTrainingType' + userId);
+
+        if (!hourSelect || !trainerWrap || !trainerSelect || !trainingTypeWrap || !trainingTypeSelect) {
+            return;
+        }
+
+        var options = receptionTrainerOptionsByHour[String(hourSelect.value)] || [];
+        trainerSelect.innerHTML = '<option value="">Само корт</option>';
+        trainingTypeSelect.innerHTML = '<option value="">Изберете вид</option>';
+        trainingTypeWrap.classList.add('d-none');
+
+        if (!options.length) {
+            trainerWrap.classList.add('d-none');
+            return;
+        }
+
+        options.forEach(function(optionData) {
+            var option = document.createElement('option');
+            option.value = optionData.id;
+            option.textContent = optionData.name;
+            trainerSelect.appendChild(option);
+        });
+
+        trainerWrap.classList.remove('d-none');
+    }
+
     document.querySelectorAll('.pos-tab').forEach(function(tab) {
         tab.addEventListener('click', function() {
             activatePosTab(tab.dataset.tab);
@@ -1761,6 +1850,19 @@
                 url.searchParams.delete('q');
             }
             window.history.replaceState({}, '', url);
+        });
+    });
+
+    document.querySelectorAll('.reception-hour-select').forEach(function(select) {
+        updateReceptionTrainerOptions(select.dataset.userId);
+        select.addEventListener('change', function() {
+            updateReceptionTrainerOptions(select.dataset.userId);
+        });
+    });
+
+    document.querySelectorAll('.reception-trainer-select').forEach(function(select) {
+        select.addEventListener('change', function() {
+            fillReceptionTrainingTypes(select.dataset.userId);
         });
     });
 

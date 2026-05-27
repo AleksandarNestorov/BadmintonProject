@@ -1,3 +1,4 @@
+import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from .models import Product, TrainerProfile, Court, Booking, Sale, SaleItem, CashTransaction, ShiftClose, User
@@ -15,9 +16,36 @@ from zoneinfo import ZoneInfo
 
 BOOKING_GRACE_PERIOD = timedelta(minutes=30)
 BOOKING_MAX_DAYS_AHEAD = 14
+TRAINER_BOOKING_MAX_DAYS_AHEAD = 30
+MAX_DAILY_BOOKINGS_PER_CUSTOMER = 6
 BOOKING_TIME_ZONE = ZoneInfo('Europe/Sofia')
 RECEPTION_BILL_SESSION_KEY = 'reception_bill'
 RECEPTION_SERVICE_CATEGORIES = ['game', 'rental', 'stringing', 'training']
+TRAINING_TYPE_LABELS = {
+    'amateur': 'Любителска тренировка',
+    'individual': 'Индивидуална тренировка',
+}
+TRAINER_BOOKING_RULES = {
+    'trainer_martin_petrov': [
+        {
+            'weekdays': {0, 2, 4},
+            'hours': [19, 20],
+            'training_types': ['amateur', 'individual'],
+        },
+    ],
+    'trainer_elena_georgieva': [
+        {
+            'weekdays': {1, 3},
+            'hours': [18, 19],
+            'training_types': ['amateur', 'individual'],
+        },
+        {
+            'weekdays': {5},
+            'hours': [10, 11, 12, 13],
+            'training_types': ['amateur'],
+        },
+    ],
+}
 
 
 def get_slot_start(selected_date, hour):
@@ -34,13 +62,19 @@ def is_slot_bookable(selected_date, hour):
     return datetime.now(BOOKING_TIME_ZONE) < local_slot_start + BOOKING_GRACE_PERIOD
 
 
-def get_booking_date_bounds():
+def get_booking_max_days_ahead(user=None):
+    if user and getattr(user, 'is_authenticated', False) and getattr(user, 'role', '') == 'trainer':
+        return TRAINER_BOOKING_MAX_DAYS_AHEAD
+    return BOOKING_MAX_DAYS_AHEAD
+
+
+def get_booking_date_bounds(user=None):
     today = timezone.localdate()
-    return today, today + timedelta(days=BOOKING_MAX_DAYS_AHEAD)
+    return today, today + timedelta(days=get_booking_max_days_ahead(user))
 
 
-def parse_schedule_date(date_str):
-    min_date, max_date = get_booking_date_bounds()
+def parse_schedule_date(date_str, user=None):
+    min_date, max_date = get_booking_date_bounds(user)
 
     if date_str:
         try:
@@ -58,9 +92,55 @@ def parse_schedule_date(date_str):
     return selected_date, min_date, max_date, False
 
 
-def is_date_in_booking_window(selected_date):
-    min_date, max_date = get_booking_date_bounds()
+def is_date_in_booking_window(selected_date, user=None):
+    min_date, max_date = get_booking_date_bounds(user)
     return min_date <= selected_date <= max_date
+
+
+def build_training_type_options(training_types):
+    return [
+        {
+            'value': training_type,
+            'label': TRAINING_TYPE_LABELS[training_type],
+        }
+        for training_type in training_types
+        if training_type in TRAINING_TYPE_LABELS
+    ]
+
+
+def build_trainer_options_by_hour(selected_date):
+    weekday = selected_date.weekday()
+    trainers_by_username = {
+        user.username: user
+        for user in User.objects.filter(
+            username__in=TRAINER_BOOKING_RULES.keys(),
+            role='trainer',
+            is_active=True,
+        )
+    }
+    options_by_hour = {}
+
+    for username, availability_rules in TRAINER_BOOKING_RULES.items():
+        trainer = trainers_by_username.get(username)
+        if not trainer:
+            continue
+
+        trainer_name = trainer.get_full_name() or trainer.username
+        for rule in availability_rules:
+            if weekday not in rule['weekdays']:
+                continue
+
+            trainer_option = {
+                'id': trainer.id,
+                'name': trainer_name,
+                'training_types': build_training_type_options(rule['training_types']),
+                'training_type_values': rule['training_types'],
+            }
+
+            for hour in rule['hours']:
+                options_by_hour.setdefault(hour, []).append(trainer_option)
+
+    return options_by_hour
 
 
 def user_can_access_reception(user):
@@ -386,16 +466,17 @@ def register(request):
 
 # --- 3. ГРАФИК (За Клиенти) ---
 def schedule(request):
-    selected_date, min_booking_date, max_booking_date, date_was_clamped = parse_schedule_date(request.GET.get('date'))
+    selected_date, min_booking_date, max_booking_date, date_was_clamped = parse_schedule_date(request.GET.get('date'), request.user)
     if date_was_clamped:
-        messages.warning(request, 'Можете да запазвате часове само за днес и до 14 дни напред.')
+        messages.warning(request, 'Можете да запазвате часове само в позволения период за този профил.')
 
     courts = Court.objects.filter(is_active=True)
     start_hour = 8
     end_hour = 22
     hours_range = range(start_hour, end_hour)
 
-    bookings = Booking.objects.filter(start_time__date=selected_date, is_active=True)
+    bookings = Booking.objects.filter(start_time__date=selected_date, is_active=True).select_related('customer', 'trainer', 'court')
+    trainer_options_by_hour = build_trainer_options_by_hour(selected_date)
 
     schedule_data = []
     for hour in hours_range:
@@ -434,6 +515,10 @@ def schedule(request):
             request.user.is_authenticated
             and request.user.role in ['admin', 'employee']
         ),
+        'schedule_trainer_options_json': json.dumps(
+            {str(hour): options for hour, options in trainer_options_by_hour.items()},
+            ensure_ascii=False,
+        ),
     }
     return render(request, 'schedule.html', context)
 
@@ -450,20 +535,14 @@ def make_booking(request):
         date_str = request.POST.get('date')
         hour = int(request.POST.get('hour'))
         court_id = int(request.POST.get('court_id'))
+        trainer_id = request.POST.get('trainer_id') or ''
+        training_type = (request.POST.get('training_type') or '').strip()
         
         court = Court.objects.get(id=court_id)
         date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
         start_time = get_slot_start(date_obj, hour)
         end_time = start_time + timedelta(hours=1)
 
-        if not is_date_in_booking_window(date_obj):
-            messages.error(request, 'Можете да запазвате часове само за днес и до 14 дни напред.')
-            return redirect(request.META.get('HTTP_REFERER', 'schedule'))
-
-        if not is_slot_bookable(date_obj, hour):
-            messages.error(request, 'Този час вече е изминал и не може да бъде запазен.')
-            return redirect(request.META.get('HTTP_REFERER', 'schedule'))
-        
         customer = request.user
         customer_id = request.POST.get('customer_id')
         if customer_id:
@@ -473,19 +552,85 @@ def make_booking(request):
                 messages.error(request, 'Нямате права да запазвате час за друг клиент.')
                 return redirect(request.META.get('HTTP_REFERER', 'schedule'))
 
+        if not is_date_in_booking_window(date_obj, customer):
+            messages.error(request, 'Можете да запазвате часове само в позволения период за този профил.')
+            return redirect(request.META.get('HTTP_REFERER', 'schedule'))
+
+        if not is_slot_bookable(date_obj, hour):
+            messages.error(request, 'Този час вече е изминал и не може да бъде запазен.')
+            return redirect(request.META.get('HTTP_REFERER', 'schedule'))
+
+        trainer = None
+        slot_trainer_options = build_trainer_options_by_hour(date_obj).get(hour, [])
+        slot_trainer_options_by_id = {
+            option['id']: option
+            for option in slot_trainer_options
+        }
+
+        if trainer_id or training_type:
+            if not trainer_id or not training_type:
+                messages.error(request, 'За резервация с треньор трябва да изберете и треньор, и вид тренировка.')
+                return redirect(request.META.get('HTTP_REFERER', 'schedule'))
+
+            try:
+                trainer_id = int(trainer_id)
+            except ValueError:
+                messages.error(request, 'Невалиден избор на треньор.')
+                return redirect(request.META.get('HTTP_REFERER', 'schedule'))
+
+            trainer_option = slot_trainer_options_by_id.get(trainer_id)
+            if not trainer_option:
+                messages.error(request, 'За този ден и час няма наличен избраният треньор.')
+                return redirect(request.META.get('HTTP_REFERER', 'schedule'))
+
+            if training_type not in trainer_option['training_type_values']:
+                messages.error(request, 'Избраният вид тренировка не е наличен за този треньор в този час.')
+                return redirect(request.META.get('HTTP_REFERER', 'schedule'))
+
+            trainer = get_object_or_404(User, id=trainer_id, role='trainer')
+            trainer_is_busy = Booking.objects.filter(
+                trainer=trainer,
+                start_time=start_time,
+                is_active=True,
+            ).exists()
+            if trainer_is_busy:
+                messages.error(request, f'Треньор {trainer.get_full_name() or trainer.username} вече има записана тренировка за този час.')
+                return redirect(request.META.get('HTTP_REFERER', 'schedule'))
+
         exists = Booking.objects.filter(court=court, start_time=start_time, is_active=True).exists()
+
+        if customer.role == 'customer':
+            customer_daily_bookings = Booking.objects.filter(
+                customer=customer,
+                start_time__date=date_obj,
+                is_active=True,
+            ).count()
+            if customer_daily_bookings >= MAX_DAILY_BOOKINGS_PER_CUSTOMER:
+                messages.error(
+                    request,
+                    f'Клиент може да има най-много {MAX_DAILY_BOOKINGS_PER_CUSTOMER} активни резервации за един ден.',
+                )
+                return redirect(request.META.get('HTTP_REFERER', 'schedule'))
         
         if exists:
             messages.error(request, 'Грешка: Този час вече е зает!')
         else:
-            Booking.objects.create(
+            booking = Booking.objects.create(
                 court=court,
                 customer=customer,
+                trainer=trainer,
                 start_time=start_time,
                 end_time=end_time,
-                payment_status='not_paid'
+                payment_status='not_paid',
+                training_type=training_type,
             )
-            messages.success(request, f'Успешно запазихте час за {customer.get_full_name() or customer.username}!')
+            success_message = f'Успешно запазихте час за {customer.get_full_name() or customer.username}!'
+            if booking.trainer and booking.training_type:
+                success_message += (
+                    f" Тренировка с {booking.trainer.get_full_name() or booking.trainer.username} "
+                    f"({booking.get_training_type_display()})."
+                )
+            messages.success(request, success_message)
             
         # Връщаме се там, откъдето сме дошли (или в графика, или в рецепцията)
         return redirect(request.META.get('HTTP_REFERER', 'schedule'))
@@ -503,8 +648,27 @@ def booking_login_required(request):
 # --- 5. ПРОФИЛ ---
 @login_required
 def profile(request):
-    bookings = Booking.objects.filter(customer=request.user).order_by('-start_time')
-    context = {'bookings': bookings, 'now': timezone.now()}
+    is_trainer_profile = request.user.role == 'trainer'
+    if is_trainer_profile:
+        bookings = (
+            Booking.objects
+            .filter(trainer=request.user)
+            .select_related('court', 'customer', 'trainer')
+            .order_by('-start_time')
+        )
+    else:
+        bookings = (
+            Booking.objects
+            .filter(customer=request.user)
+            .select_related('court', 'customer', 'trainer')
+            .order_by('-start_time')
+        )
+
+    context = {
+        'bookings': bookings,
+        'now': timezone.now(),
+        'is_trainer_profile': is_trainer_profile,
+    }
     return render(request, 'profile.html', context)
 
 # --- 6. ОТКАЗ НА РЕЗЕРВАЦИЯ ---
@@ -530,9 +694,9 @@ def reception(request):
     if not user_can_access_reception(request.user):
         return redirect('home')
 
-    selected_date, min_booking_date, max_booking_date, date_was_clamped = parse_schedule_date(request.GET.get('date'))
+    selected_date, min_booking_date, max_booking_date, date_was_clamped = parse_schedule_date(request.GET.get('date'), request.user)
     if date_was_clamped:
-        messages.warning(request, 'Можете да запазвате часове само за днес и до 14 дни напред.')
+        messages.warning(request, 'Можете да запазвате часове само в позволения период за този профил.')
 
     all_products = Product.objects.all()
     products = all_products.filter(category__in=['drink', 'product']).order_by('category', 'name')
@@ -546,7 +710,8 @@ def reception(request):
     daily_bookings = Booking.objects.filter(
         start_time__date=selected_date, 
         is_active=True
-    ).order_by('start_time')
+    ).select_related('customer', 'trainer', 'court').order_by('start_time')
+    trainer_options_by_hour = build_trainer_options_by_hour(selected_date)
 
     schedule_data = []
     for hour in hours_range:
@@ -603,6 +768,10 @@ def reception(request):
         'bill_items': bill_context['items'],
         'bill_total': bill_context['total'],
         'bill_count': bill_context['count'],
+        'schedule_trainer_options_json': json.dumps(
+            {str(hour): options for hour, options in trainer_options_by_hour.items()},
+            ensure_ascii=False,
+        ),
         **reports_context,
     }
     return render(request, 'reception.html', context)

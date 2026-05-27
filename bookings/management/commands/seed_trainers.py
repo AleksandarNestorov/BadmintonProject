@@ -14,7 +14,10 @@ TRAINERS = [
             "първенство на двойки. Над 8 години опит в подготовката на "
             "начинаещи и напреднали състезатели."
         ),
-        "schedule_days": "Понеделник, сряда и петък: 17:00 - 21:00",
+        "schedule_days": (
+            "Понеделник, сряда и петък: 17:00 до 19:00 - детска групова тренировка\n"
+            "19:00 до 21:00 - тренировка за любители"
+        ),
     },
     {
         "username": "trainer_elena_georgieva",
@@ -26,7 +29,11 @@ TRAINERS = [
             "на отличия от регионални състезания. Работи с групи за начинаещи "
             "и индивидуални тренировки."
         ),
-        "schedule_days": "Вторник и четвъртък: 16:00 - 20:00; събота: 10:00 - 14:00",
+        "schedule_days": (
+            "Вторник и четвъртък: 16:00 до 18:00 - детска групова тренировка\n"
+            "18:00 до 20:00 - тренировка за любители\n"
+            "събота: 10:00 до 14:00 - само за любители"
+        ),
     },
 ]
 
@@ -36,13 +43,18 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         for trainer in TRAINERS:
-            user, _ = User.objects.get_or_create(username=trainer["username"])
+            user, created = User.objects.get_or_create(username=trainer["username"])
             user.first_name = trainer["first_name"]
             user.last_name = trainer["last_name"]
-            user.email = f"{trainer['username']}@badminton.local"
             user.role = "trainer"
-            user.is_active = False
-            user.set_unusable_password()
+
+            if created and not user.email:
+                user.email = f"{trainer['username']}@badminton.local"
+
+            if created:
+                user.is_active = False
+                user.set_unusable_password()
+
             user.save()
 
             TrainerProfile.objects.update_or_create(

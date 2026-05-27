@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Моят Профил</title>
+    <title>Моят профил</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     {% load static %}
     <link href="{% static 'css/site-ui.css' %}" rel="stylesheet">
@@ -36,7 +36,6 @@
 </nav>
 
 <div class="container page-shell">
-    
     {% if messages %}
         {% for message in messages %}
             <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
@@ -67,7 +66,13 @@
         <div class="col-md-8">
             <div class="card app-card">
                 <div class="app-card-header d-flex justify-content-between align-items-center">
-                    <h5 class="app-card-title">Моите резервации</h5>
+                    <h5 class="app-card-title">
+                        {% if is_trainer_profile %}
+                            Моите тренировки
+                        {% else %}
+                            Моите резервации
+                        {% endif %}
+                    </h5>
                 </div>
                 <div class="card-body p-0">
                     <table class="table table-hover mb-0 text-center align-middle data-table">
@@ -76,6 +81,12 @@
                                 <th>Дата</th>
                                 <th>Час</th>
                                 <th>Корт</th>
+                                {% if is_trainer_profile %}
+                                    <th>Клиент</th>
+                                    <th>Вид</th>
+                                {% else %}
+                                    <th>Детайли</th>
+                                {% endif %}
                                 <th>Статус</th>
                                 <th>Действие</th>
                             </tr>
@@ -86,6 +97,19 @@
                                 <td>{{ booking.start_time|date:"d.m.Y" }}</td>
                                 <td class="fw-bold">{{ booking.start_time|date:"H:i" }}</td>
                                 <td>{{ booking.court.name }}</td>
+                                {% if is_trainer_profile %}
+                                    <td>{{ booking.customer.get_full_name|default:booking.customer.username }}</td>
+                                    <td>{{ booking.get_training_type_display|default:"Тренировка" }}</td>
+                                {% else %}
+                                    <td class="text-start">
+                                        {% if booking.trainer %}
+                                            <div class="fw-semibold">{{ booking.get_training_type_display }}</div>
+                                            <div class="small text-muted">С треньор {{ booking.trainer.get_full_name|default:booking.trainer.username }}</div>
+                                        {% else %}
+                                            <span class="text-muted">Стандартна резервация</span>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
                                 <td>
                                     {% if booking.start_time < now %}
                                         <span class="badge bg-secondary">Минала</span>
@@ -94,7 +118,7 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if booking.start_time > now %}
+                                    {% if not is_trainer_profile and booking.start_time > now %}
                                         <a href="{% url 'cancel_booking' booking.id %}" 
                                            class="btn btn-outline-danger btn-sm fw-bold"
                                            onclick="return confirm('Сигурни ли сте, че искате да откажете часа?')">
@@ -107,8 +131,12 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="5" class="py-4 text-muted">
-                                    Нямате записани часове. <a href="{% url 'schedule' %}">Запазете сега!</a>
+                                <td colspan="{% if is_trainer_profile %}7{% else %}6{% endif %}" class="py-4 text-muted">
+                                    {% if is_trainer_profile %}
+                                        Все още няма записани тренировки към този профил.
+                                    {% else %}
+                                        Нямате записани часове. <a href="{% url 'schedule' %}">Запазете сега!</a>
+                                    {% endif %}
                                 </td>
                             </tr>
                             {% endfor %}

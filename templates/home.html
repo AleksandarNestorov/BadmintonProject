@@ -497,7 +497,8 @@
                                 <p class="fw-semibold text-dark mb-3">{{ trainer.expertise_level }}</p>
                                 <p class="trainer-achievements mb-4">{{ trainer.achievements }}</p>
                                 <div class="trainer-schedule small">
-                                    <span class="fw-bold">График:</span> {{ trainer.schedule_days }}
+                                    <span class="fw-bold d-block mb-1">График:</span>
+                                    {{ trainer.schedule_days|linebreaksbr }}
                                 </div>
                             </div>
                         </div>

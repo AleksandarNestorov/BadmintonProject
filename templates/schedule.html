@@ -50,6 +50,34 @@
             display: none;
             z-index: 1000;
         }
+        .trainer-booking-panel {
+            min-width: min(100%, 420px);
+            background: #f8fafc;
+            border: 1px solid #dbe4f0;
+            border-radius: 8px;
+            padding: 0.9rem;
+        }
+        .trainer-booking-panel label {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            margin-bottom: 0.35rem;
+        }
+        .trainer-booking-note {
+            font-size: 0.82rem;
+            color: #64748b;
+        }
+        .booking-policy-note {
+            max-width: 520px;
+            background: #fff8e1;
+            border: 1px solid #f6d365;
+            color: #7c5b00;
+            border-radius: 8px;
+            padding: 0.85rem 1rem;
+            font-size: 0.9rem;
+            line-height: 1.45;
+        }
     </style>
 </head>
 <body class="app-page pb-5">
@@ -75,7 +103,6 @@
 </nav>
 
 <div class="container page-shell">
-    
     {% if messages %}
         {% for message in messages %}
             <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
@@ -127,7 +154,6 @@
                     {% for row in schedule_data %}
                     <tr>
                         <td class="fw-bold bg-light">{{ row.hour }}</td>
-                        
                         {% for slot in row.slots %}
                             <td>
                                 {% if slot.is_taken %}
@@ -142,8 +168,10 @@
                                         Свободно
                                     </div>
                                 {% else %}
-                                    <div class="p-2 w-100 slot-cell" 
-                                         onclick="selectSlot(this, '{{ slot.court.id }}', '{{ slot.court.name }}', '{{ slot.hour }}')">
+                                    <div
+                                        class="p-2 w-100 slot-cell"
+                                        onclick="selectSlot(this, '{{ slot.court.id }}', '{{ slot.court.name }}', '{{ slot.hour }}')"
+                                    >
                                         Свободно
                                     </div>
                                 {% endif %}
@@ -158,25 +186,55 @@
 </div>
 
 <div id="actionBar" class="bottom-action-bar text-center">
-    <div class="container d-flex justify-content-between align-items-center">
-        <h5 class="m-0">
-            Избрано: <span id="selectionText" class="fw-bold text-primary">---</span>
-        </h5>
-        
-        <div>
-            <button class="btn btn-outline-navy me-2" onclick="clearSelection()">
+    <div class="container d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div class="text-start">
+            <h5 class="m-0">
+                Избрано: <span id="selectionText" class="fw-bold text-primary">---</span>
+            </h5>
+            {% if user.is_authenticated and user.role == 'customer' %}
+                <div class="booking-policy-note mt-2">
+                    При невъзможност да използвате запазения час, моля отменете резервацията поне 24 часа предварително, за да можем да освободим корта за други клиенти.
+                </div>
+            {% endif %}
+            {% if user.is_authenticated %}
+                <div id="trainerOptionsPanel" class="trainer-booking-panel mt-2" style="display: none;">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-6">
+                            <label for="trainerSelect" class="form-label">Треньор</label>
+                            <select id="trainerSelect" class="form-select">
+                                <option value="">Само корт</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6" id="trainingTypeWrap" style="display: none;">
+                            <label for="trainingTypeSelect" class="form-label">Вид тренировка</label>
+                            <select id="trainingTypeSelect" class="form-select">
+                                <option value="">Изберете вид</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="trainer-booking-note mt-2">
+                        Опцията за треньор се показва само в часовете, в които треньорите са налични.
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <button class="btn btn-outline-navy" onclick="clearSelection()">
                 Премахни избора
             </button>
-            
+
             {% if user.is_authenticated %}
-                <form action="{% url 'make_booking' %}" method="post" class="d-inline">
+                <form action="{% url 'make_booking' %}" method="post" class="d-flex flex-wrap align-items-center gap-2">
                     {% csrf_token %}
                     <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}">
                     <input type="hidden" name="court_id" id="inputCourtId">
                     <input type="hidden" name="hour" id="inputHour">
+                    <input type="hidden" name="trainer_id" id="inputTrainerId">
+                    <input type="hidden" name="training_type" id="inputTrainingType">
 
                     <button type="submit" class="btn btn-brand btn-lg">
-                        Запази моят избор
+                        Запази моя избор
                     </button>
                 </form>
             {% else %}
@@ -189,21 +247,138 @@
 </div>
 
 <script>
+    const trainerOptionsByHour = JSON.parse('{{ schedule_trainer_options_json|escapejs }}');
+    let currentTrainerOptions = [];
+
+    function syncTrainerSelection() {
+        const trainerSelect = document.getElementById('trainerSelect');
+        const trainingTypeSelect = document.getElementById('trainingTypeSelect');
+        const inputTrainerId = document.getElementById('inputTrainerId');
+        const inputTrainingType = document.getElementById('inputTrainingType');
+
+        if (!trainerSelect || !trainingTypeSelect || !inputTrainerId || !inputTrainingType) {
+            return;
+        }
+
+        inputTrainerId.value = trainerSelect.value;
+        inputTrainingType.value = trainingTypeSelect.value;
+    }
+
+    function populateTrainingTypes(trainerId) {
+        const trainingTypeWrap = document.getElementById('trainingTypeWrap');
+        const trainingTypeSelect = document.getElementById('trainingTypeSelect');
+        if (!trainingTypeWrap || !trainingTypeSelect) {
+            return;
+        }
+
+        trainingTypeSelect.innerHTML = '<option value="">Изберете вид</option>';
+
+        if (!trainerId) {
+            trainingTypeWrap.style.display = 'none';
+            syncTrainerSelection();
+            return;
+        }
+
+        const selectedTrainer = currentTrainerOptions.find(option => String(option.id) === String(trainerId));
+        if (!selectedTrainer) {
+            trainingTypeWrap.style.display = 'none';
+            syncTrainerSelection();
+            return;
+        }
+
+        selectedTrainer.training_types.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type.value;
+            option.textContent = type.label;
+            trainingTypeSelect.appendChild(option);
+        });
+
+        trainingTypeWrap.style.display = 'block';
+        syncTrainerSelection();
+    }
+
+    function updateTrainerOptions(hour) {
+        const trainerPanel = document.getElementById('trainerOptionsPanel');
+        const trainerSelect = document.getElementById('trainerSelect');
+        const trainingTypeWrap = document.getElementById('trainingTypeWrap');
+        const trainingTypeSelect = document.getElementById('trainingTypeSelect');
+        if (!trainerPanel || !trainerSelect || !trainingTypeWrap || !trainingTypeSelect) {
+            return;
+        }
+
+        currentTrainerOptions = trainerOptionsByHour[String(hour)] || [];
+        trainerSelect.innerHTML = '<option value="">Само корт</option>';
+        trainingTypeSelect.innerHTML = '<option value="">Изберете вид</option>';
+
+        if (!currentTrainerOptions.length) {
+            trainerPanel.style.display = 'none';
+            trainingTypeWrap.style.display = 'none';
+            syncTrainerSelection();
+            return;
+        }
+
+        currentTrainerOptions.forEach(optionData => {
+            const option = document.createElement('option');
+            option.value = optionData.id;
+            option.textContent = optionData.name;
+            trainerSelect.appendChild(option);
+        });
+
+        trainerPanel.style.display = 'block';
+        trainingTypeWrap.style.display = 'none';
+        syncTrainerSelection();
+    }
+
     function selectSlot(element, courtId, courtName, hour) {
-        var allSlots = document.querySelectorAll('.slot-cell');
+        const allSlots = document.querySelectorAll('.slot-cell');
         allSlots.forEach(el => el.classList.remove('slot-selected'));
         element.classList.add('slot-selected');
         document.getElementById('actionBar').style.display = 'block';
-        document.getElementById('selectionText').innerText = courtName + " в " + hour + ":00 часа";
+        document.getElementById('selectionText').innerText = courtName + ' в ' + hour + ':00 часа';
         document.getElementById('inputCourtId').value = courtId;
         document.getElementById('inputHour').value = hour;
+        updateTrainerOptions(hour);
     }
 
     function clearSelection() {
-        var allSlots = document.querySelectorAll('.slot-cell');
+        const allSlots = document.querySelectorAll('.slot-cell');
         allSlots.forEach(el => el.classList.remove('slot-selected'));
         document.getElementById('actionBar').style.display = 'none';
+
+        const trainerPanel = document.getElementById('trainerOptionsPanel');
+        const trainingTypeWrap = document.getElementById('trainingTypeWrap');
+        const trainerSelect = document.getElementById('trainerSelect');
+        const trainingTypeSelect = document.getElementById('trainingTypeSelect');
+
+        if (trainerPanel) {
+            trainerPanel.style.display = 'none';
+        }
+        if (trainingTypeWrap) {
+            trainingTypeWrap.style.display = 'none';
+        }
+        if (trainerSelect) {
+            trainerSelect.value = '';
+        }
+        if (trainingTypeSelect) {
+            trainingTypeSelect.innerHTML = '<option value="">Изберете вид</option>';
+        }
+
+        syncTrainerSelection();
     }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const trainerSelect = document.getElementById('trainerSelect');
+        const trainingTypeSelect = document.getElementById('trainingTypeSelect');
+
+        if (trainerSelect) {
+            trainerSelect.addEventListener('change', function () {
+                populateTrainingTypes(this.value);
+            });
+        }
+        if (trainingTypeSelect) {
+            trainingTypeSelect.addEventListener('change', syncTrainerSelection);
+        }
+    });
 </script>
 
 </body>

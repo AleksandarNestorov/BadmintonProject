@@ -35,7 +35,7 @@ class TrainerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='trainer_profile')
     expertise_level = models.CharField(max_length=100, default="Професионален треньор")
     achievements = models.TextField(blank=True, verbose_name="Постижения")
-    schedule_days = models.CharField(max_length=100, default="По договаряне")
+    schedule_days = models.CharField(max_length=255, default="По договаряне")
     photo = models.ImageField(upload_to='trainers/', blank=True, null=True)
 
     def __str__(self):
@@ -73,11 +73,25 @@ class Product(models.Model):
 
 # 5. Резервации
 class Booking(models.Model):
+    TRAINING_TYPE_CHOICES = (
+        ('amateur', 'Любителска тренировка'),
+        ('individual', 'Индивидуална тренировка'),
+    )
+
     court = models.ForeignKey(Court, on_delete=models.CASCADE)
     customer = models.ForeignKey(User, on_delete=models.CASCADE)
+    trainer = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='trainer_bookings',
+        limit_choices_to={'role': 'trainer'},
+    )
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     is_active = models.BooleanField(default=True)
+    training_type = models.CharField(max_length=20, choices=TRAINING_TYPE_CHOICES, blank=True, default='')
     
     PAYMENT_STATUS_CHOICES = (
         ('not_paid', 'Неплатено'),
