@@ -1,7 +1,9 @@
+import re
+
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
+
 from .models import User
-import re
 
 
 PHONE_COUNTRY_RULES = {
@@ -42,19 +44,41 @@ PHONE_COUNTRY_CHOICES = [
     for country_code, settings in PHONE_COUNTRY_RULES.items()
 ]
 
+
 class UserRegisterForm(UserCreationForm):
-    
-    first_name = forms.CharField(required=True, label="Име")
-    last_name = forms.CharField(required=True, label="Фамилия")
-    
+    username = forms.CharField(
+        label='Потребителско име',
+        help_text='Използвайте поне 3 символа с латински букви, цифри и стандартни знаци.',
+    )
+    first_name = forms.CharField(required=True, label='Име')
+    last_name = forms.CharField(required=True, label='Фамилия')
+    gender = forms.ChoiceField(
+        choices=[('', 'Изберете пол'), *User.GENDER_CHOICES],
+        required=True,
+        label='Пол',
+    )
+    password1 = forms.CharField(
+        label='Парола',
+        strip=False,
+        widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
+        help_text='Паролата трябва да съдържа поне 8 символа.',
+    )
+    password2 = forms.CharField(
+        label='Потвърди паролата',
+        strip=False,
+        widget=forms.PasswordInput(attrs={'autocomplete': 'new-password'}),
+        help_text='Въведете същата парола отново за потвърждение.',
+    )
     email = forms.EmailField(
         required=True,
-        label="Имейл адрес",
-        widget=forms.TextInput(attrs={
-            'inputmode': 'email',
-            'autocomplete': 'email',
-            'placeholder': 'example@email.com',
-        }),
+        label='Имейл адрес',
+        widget=forms.TextInput(
+            attrs={
+                'inputmode': 'email',
+                'autocomplete': 'email',
+                'placeholder': 'example@email.com',
+            }
+        ),
         error_messages={
             'invalid': 'Имейлът трябва да бъде валиден и изписан с латински букви.',
         },
@@ -62,33 +86,56 @@ class UserRegisterForm(UserCreationForm):
     phone_country = forms.ChoiceField(
         choices=PHONE_COUNTRY_CHOICES,
         initial='BG',
-        label="Държава",
+        label='Държава',
     )
     phone = forms.CharField(
         required=True,
-        label="Телефон за връзка",
-        help_text="За България въведете 9 цифри след +359, например 888123456.",
+        label='Телефон за връзка',
+        help_text='За България въведете 9 цифри след +359, например 888123456.',
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.order_fields([
+            'username',
+            'first_name',
+            'last_name',
+            'gender',
+            'email',
+            'phone_country',
+            'phone',
+            'password1',
+            'password2',
+        ])
         for field_name, field in self.fields.items():
             if field_name == 'phone_country':
                 field.widget.attrs.update({'class': 'form-select'})
             else:
                 field.widget.attrs.update({'class': 'form-control'})
 
-        self.fields['phone_country'].widget.attrs.update({
-            'data-phone-rules': '|'.join(
-                f"{code}:{rule['prefix']}:{rule['digits']}:{rule['example']}"
-                for code, rule in PHONE_COUNTRY_RULES.items()
-            )
-        })
-        self.fields['phone'].widget.attrs.update({
-            'inputmode': 'numeric',
-            'autocomplete': 'tel-national',
-            'placeholder': PHONE_COUNTRY_RULES['BG']['example'],
-        })
+        self.fields['phone_country'].widget.attrs.update(
+            {
+                'data-phone-rules': '|'.join(
+                    f"{code}:{rule['prefix']}:{rule['digits']}:{rule['example']}"
+                    for code, rule in PHONE_COUNTRY_RULES.items()
+                )
+            }
+        )
+        self.fields['phone'].widget.attrs.update(
+            {
+                'inputmode': 'numeric',
+                'autocomplete': 'tel-national',
+                'placeholder': PHONE_COUNTRY_RULES['BG']['example'],
+            }
+        )
+        self.fields['username'].widget.attrs.update(
+            {
+                'autocomplete': 'username',
+                'placeholder': 'Напр. aleks123',
+            }
+        )
+        self.fields['password1'].widget.attrs.update({'placeholder': 'Въведете парола'})
+        self.fields['password2'].widget.attrs.update({'placeholder': 'Повторете паролата'})
 
     def clean_email(self):
         email = self.cleaned_data['email'].strip()
@@ -116,4 +163,109 @@ class UserRegisterForm(UserCreationForm):
 
     class Meta:
         model = User
-        fields = ['username', 'first_name', 'last_name', 'email', 'phone_country', 'phone']
+        fields = ['username', 'first_name', 'last_name', 'gender', 'email', 'phone_country', 'phone']
+
+
+class CustomerProfileEditForm(forms.ModelForm):
+    phone_country = forms.ChoiceField(
+        choices=PHONE_COUNTRY_CHOICES,
+        initial='BG',
+        label='Държава',
+    )
+    phone = forms.CharField(
+        required=True,
+        label='Телефон за връзка',
+        help_text='Въведете телефонния номер според избраната държава.',
+    )
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email', 'phone']
+        labels = {
+            'first_name': 'Име',
+            'last_name': 'Фамилия',
+            'email': 'Имейл адрес',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name, field in self.fields.items():
+            if field_name == 'phone_country':
+                field.widget.attrs.update({'class': 'form-select'})
+            else:
+                field.widget.attrs.update({'class': 'form-control'})
+
+        self.fields['phone_country'].widget.attrs.update(
+            {
+                'data-phone-rules': '|'.join(
+                    f"{code}:{rule['prefix']}:{rule['digits']}:{rule['example']}"
+                    for code, rule in PHONE_COUNTRY_RULES.items()
+                )
+            }
+        )
+
+        self.fields['email'].widget.attrs.update(
+            {
+                'inputmode': 'email',
+                'autocomplete': 'email',
+                'placeholder': 'example@email.com',
+            }
+        )
+        self.fields['phone'].widget.attrs.update(
+            {
+                'inputmode': 'numeric',
+                'autocomplete': 'tel-national',
+            }
+        )
+
+        saved_phone = (self.instance.phone or '').strip()
+        for country_code, rule in PHONE_COUNTRY_RULES.items():
+            if saved_phone.startswith(rule['prefix']):
+                self.fields['phone_country'].initial = country_code
+                self.fields['phone'].initial = saved_phone[len(rule['prefix']):]
+                self.fields['phone'].widget.attrs['placeholder'] = rule['example']
+                break
+        else:
+            self.fields['phone_country'].initial = 'BG'
+            self.fields['phone'].widget.attrs['placeholder'] = PHONE_COUNTRY_RULES['BG']['example']
+
+    def clean_email(self):
+        email = self.cleaned_data['email'].strip()
+        if not re.fullmatch(r'[A-Za-z0-9._%+\-@]+', email):
+            raise forms.ValidationError(
+                'Имейлът трябва да бъде изписан само с латински букви, цифри и стандартни символи.'
+            )
+        return email
+
+    def clean_phone(self):
+        phone_country = self.cleaned_data.get('phone_country', 'BG')
+        phone = self.cleaned_data['phone'].strip()
+        digits = re.sub(r'\D', '', phone)
+        rule = PHONE_COUNTRY_RULES[phone_country]
+
+        if phone.startswith(rule['prefix']):
+            digits = digits[len(rule['prefix'].lstrip('+')):]
+
+        if len(digits) != rule['digits']:
+            raise forms.ValidationError(
+                f"За {rule['label']} телефонът трябва да съдържа точно {rule['digits']} цифри след {rule['prefix']}."
+            )
+
+        return f"{rule['prefix']}{digits}"
+
+
+class ProfilePhotoForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['profile_photo']
+        labels = {
+            'profile_photo': 'Профилна снимка',
+        }
+        widgets = {
+            'profile_photo': forms.FileInput(attrs={'accept': 'image/*'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['profile_photo'].required = False
+        self.fields['profile_photo'].widget.attrs.update({'class': 'form-control'})

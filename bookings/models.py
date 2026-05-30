@@ -3,13 +3,19 @@ from django.contrib.auth.models import AbstractUser
 
 # 1. Потребител
 class User(AbstractUser):
+    GENDER_CHOICES = (
+        ('male', 'Мъж'),
+        ('female', 'Жена'),
+    )
     phone = models.CharField(max_length=20, blank=True, null=True, verbose_name="Телефон")
+    gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True, default='', verbose_name="Пол")
+    profile_photo = models.ImageField(upload_to='profiles/', blank=True, null=True, verbose_name="Профилна снимка")
     
     ROLE_CHOICES = (
-        ('customer', 'Customer'),
-        ('trainer', 'Trainer'),
-        ('employee', 'Employee'),
-        ('admin', 'Admin'),
+        ('customer', 'Клиент'),
+        ('trainer', 'Треньор'),
+        ('employee', 'Служител'),
+        ('admin', 'Администратор'),
     )
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='customer')
 

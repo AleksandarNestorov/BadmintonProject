@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Моят профил</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     {% load static %}
     <link href="{% static 'css/site-ui.css' %}" rel="stylesheet">
 </head>
@@ -45,25 +46,123 @@
         {% endfor %}
     {% endif %}
 
-    <div class="row">
-        <div class="col-md-4 mb-4">
-            <div class="card app-card">
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card app-card mb-4">
                 <div class="app-card-header">
-                    <div class="section-kicker mb-1">Profile</div>
-                    <h5 class="app-card-title">Моите данни</h5>
+                    <div class="section-kicker mb-1">Профил</div>
+                    <h5 class="app-card-title">Профилна снимка</h5>
+                </div>
+                <div class="card-body">
+                    <div class="profile-avatar-wrap text-center mb-4">
+                        <div
+                            id="profilePhotoTrigger"
+                            class="profile-avatar-button"
+                            title="Натиснете, за да смените снимката"
+                            role="button"
+                            tabindex="0"
+                            style="width: 168px; height: 168px; min-width: 168px; min-height: 168px; max-width: 168px; max-height: 168px;"
+                        >
+                            {% if user.profile_photo %}
+                                <img
+                                    src="{{ user.profile_photo.url }}"
+                                    alt="{{ user.get_full_name|default:user.username }}"
+                                    class="profile-avatar-image"
+                                    id="profileAvatarPreview"
+                                    style="width: 168px; height: 168px; min-width: 168px; min-height: 168px; max-width: 168px; max-height: 168px; object-fit: cover; object-position: center; display: block;"
+                                >
+                            {% else %}
+                                <div
+                                    class="profile-avatar-placeholder"
+                                    id="profileAvatarPreview"
+                                    style="width: 168px; height: 168px; min-width: 168px; min-height: 168px; max-width: 168px; max-height: 168px;"
+                                >
+                                    {% if user.gender == 'female' %}
+                                        <i class="bi bi-person-standing-dress"></i>
+                                    {% elif user.gender == 'male' %}
+                                        <i class="bi bi-person-standing"></i>
+                                    {% else %}
+                                        <i class="bi bi-person-circle"></i>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                            <span class="profile-avatar-overlay">
+                                <i class="bi bi-camera-fill"></i>
+                                <span>Смени снимката</span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="update_photo">
+                        {{ photo_form.profile_photo }}
+                        {% for error in photo_form.profile_photo.errors %}
+                            <div class="text-danger small mt-2">{{ error }}</div>
+                        {% endfor %}
+                        <div class="text-center text-muted small mb-3">
+                            Натиснете върху снимката, за да изберете нова.
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-navy">Запази снимка</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card app-card">
+                <div class="app-card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="section-kicker mb-1">Профил</div>
+                        <h5 class="app-card-title">Моите данни</h5>
+                    </div>
+                    {% if user.role == 'customer' %}
+                        <button type="button" class="btn btn-brand btn-sm" data-bs-toggle="collapse" data-bs-target="#editProfileCollapse" aria-expanded="{% if customer_edit_form.errors %}true{% else %}false{% endif %}">
+                            Редактиране
+                        </button>
+                    {% endif %}
                 </div>
                 <div class="card-body">
                     <p><strong>Име:</strong> {{ user.get_full_name }}</p>
                     <p><strong>Потребител:</strong> {{ user.username }}</p>
                     <p><strong>Имейл:</strong> {{ user.email }}</p>
-                    <p><strong>Телефон:</strong> {{ user.phone }}</p>
+                    <p><strong>Телефон:</strong> {{ user.phone|default:"-" }}</p>
+                    <p><strong>Пол:</strong> {{ user.get_gender_display|default:"-" }}</p>
                     <hr>
-                    <p><strong>Роля:</strong> {{ user.get_role_display }}</p>
+                    <p class="mb-0"><strong>Роля:</strong> {{ user.get_role_display }}</p>
                 </div>
+
+                {% if user.role == 'customer' %}
+                    <div id="editProfileCollapse" class="collapse {% if customer_edit_form.errors %}show{% endif %}">
+                        <div class="card-body border-top">
+                            <form method="post" novalidate>
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="update_profile">
+
+                                {% for field in customer_edit_form %}
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold">{{ field.label }}</label>
+                                        {{ field }}
+                                        {% if field.help_text %}
+                                            <small class="form-text text-muted">{{ field.help_text }}</small>
+                                        {% endif %}
+                                        {% for error in field.errors %}
+                                            <div class="text-danger small mt-1">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
+                                {% endfor %}
+
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-brand">Запази промените</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                {% endif %}
             </div>
         </div>
 
-        <div class="col-md-8">
+        <div class="col-lg-8">
             <div class="card app-card">
                 <div class="app-card-header d-flex justify-content-between align-items-center">
                     <h5 class="app-card-title">
@@ -147,6 +246,87 @@
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    (function () {
+        const countrySelect = document.getElementById('id_phone_country');
+        const phoneInput = document.getElementById('id_phone');
+        if (!countrySelect || !phoneInput || !countrySelect.dataset.phoneRules) {
+            return;
+        }
+
+        const rules = {};
+        countrySelect.dataset.phoneRules.split('|').forEach(function(item) {
+            const parts = item.split(':');
+            rules[parts[0]] = {
+                prefix: parts[1],
+                digits: parts[2],
+                example: parts[3]
+            };
+        });
+
+        function updatePhoneHint() {
+            const rule = rules[countrySelect.value];
+            if (!rule) return;
+            phoneInput.placeholder = rule.example;
+            const helpText = phoneInput.closest('.mb-3').querySelector('.form-text');
+            if (helpText) {
+                helpText.textContent = 'Въведете ' + rule.digits + ' цифри след ' + rule.prefix + ', например ' + rule.example + '.';
+            }
+        }
+
+        countrySelect.addEventListener('change', updatePhoneHint);
+        updatePhoneHint();
+    })();
+
+    (function () {
+        const trigger = document.getElementById('profilePhotoTrigger');
+        const input = document.getElementById('id_profile_photo');
+        if (!trigger || !input) {
+            return;
+        }
+
+        trigger.addEventListener('click', function () {
+            input.click();
+        });
+
+        trigger.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                input.click();
+            }
+        });
+
+        input.addEventListener('change', function () {
+            const file = input.files && input.files[0];
+            if (!file) {
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                const currentPreview = document.getElementById('profileAvatarPreview');
+                const image = document.createElement('img');
+                image.src = event.target.result;
+                image.alt = '{{ user.get_full_name|default:user.username }}';
+                image.className = 'profile-avatar-image';
+                image.id = 'profileAvatarPreview';
+                image.style.width = '168px';
+                image.style.height = '168px';
+                image.style.minWidth = '168px';
+                image.style.minHeight = '168px';
+                image.style.maxWidth = '168px';
+                image.style.maxHeight = '168px';
+                image.style.objectFit = 'cover';
+                image.style.objectPosition = 'center';
+                image.style.display = 'block';
+                currentPreview.replaceWith(image);
+            };
+            reader.readAsDataURL(file);
+        });
+    })();
+</script>
 
 </body>
 </html>

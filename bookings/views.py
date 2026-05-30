@@ -2,7 +2,7 @@ import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from .models import Product, TrainerProfile, Court, Booking, Sale, SaleItem, CashTransaction, ShiftClose, User
-from .forms import UserRegisterForm
+from .forms import CustomerProfileEditForm, ProfilePhotoForm, UserRegisterForm
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from datetime import datetime, timedelta, time
@@ -648,6 +648,34 @@ def booking_login_required(request):
 # --- 5. ПРОФИЛ ---
 @login_required
 def profile(request):
+    customer_edit_form = None
+    photo_form = None
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'update_profile':
+            if request.user.role != 'customer':
+                messages.error(request, 'Само клиентски профили могат да редактират тези данни.')
+                return redirect('profile')
+
+            customer_edit_form = CustomerProfileEditForm(request.POST, instance=request.user)
+            photo_form = ProfilePhotoForm(instance=request.user)
+            if customer_edit_form.is_valid():
+                customer_edit_form.save()
+                messages.success(request, 'Профилът беше обновен успешно.')
+                return redirect('profile')
+            messages.error(request, 'Моля, коригирайте отбелязаните полета и опитайте отново.')
+
+        elif action == 'update_photo':
+            photo_form = ProfilePhotoForm(request.POST, request.FILES, instance=request.user)
+            if request.user.role == 'customer':
+                customer_edit_form = CustomerProfileEditForm(instance=request.user)
+            if photo_form.is_valid():
+                photo_form.save()
+                messages.success(request, 'Профилната снимка беше обновена успешно.')
+                return redirect('profile')
+            messages.error(request, 'Не успяхме да обновим снимката. Проверете избраните данни.')
+
     is_trainer_profile = request.user.role == 'trainer'
     if is_trainer_profile:
         bookings = (
@@ -664,10 +692,17 @@ def profile(request):
             .order_by('-start_time')
         )
 
+    if customer_edit_form is None and request.user.role == 'customer':
+        customer_edit_form = CustomerProfileEditForm(instance=request.user)
+    if photo_form is None:
+        photo_form = ProfilePhotoForm(instance=request.user)
+
     context = {
         'bookings': bookings,
         'now': timezone.now(),
         'is_trainer_profile': is_trainer_profile,
+        'customer_edit_form': customer_edit_form,
+        'photo_form': photo_form,
     }
     return render(request, 'profile.html', context)
 

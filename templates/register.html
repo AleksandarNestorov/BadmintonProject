@@ -27,25 +27,25 @@
                     <h3 class="app-card-title">Създай нов профил</h3>
                 </div>
                 <div class="card-body">
-                    
-                    <form method="POST" id="registerForm" novalidate>
-                        {% csrf_token %} {% for field in form %}
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">{{ field.label }}</label>
-                            {{ field }} {% if field.help_text %}
-                                <small class="form-text text-muted">{{ field.help_text }}</small>
-                            {% endif %}
-                            {% for error in field.errors %}
-                                <div class="text-danger small">{{ error }}</div>
-                            {% endfor %}
-                        </div>
+                    <form method="post" id="registerForm" novalidate>
+                        {% csrf_token %}
+                        {% for field in form %}
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.help_text %}
+                                    <small class="form-text text-muted">{{ field.help_text }}</small>
+                                {% endif %}
+                                {% for error in field.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
                         {% endfor %}
-                        
+
                         <div class="d-grid gap-2">
                             <button type="submit" class="btn btn-brand btn-lg">Регистрация</button>
                         </div>
                     </form>
-
                 </div>
                 <div class="card-footer app-card-footer text-center">
                     <small>Вече имаш акаунт? <a href="{% url 'login' %}" class="site-link">Влез тук</a></small>
@@ -56,23 +56,23 @@
 </div>
 
 <script>
-    var inputs = document.querySelectorAll('input');
+    const inputs = document.querySelectorAll('input');
     inputs.forEach(function(input) {
         input.classList.add('form-control');
     });
 
-    var selects = document.querySelectorAll('select');
+    const selects = document.querySelectorAll('select');
     selects.forEach(function(select) {
         select.classList.add('form-select');
     });
 
-    var countrySelect = document.getElementById('id_phone_country');
-    var phoneInput = document.getElementById('id_phone');
-    var registerForm = document.getElementById('registerForm');
+    const countrySelect = document.getElementById('id_phone_country');
+    const phoneInput = document.getElementById('id_phone');
+    const registerForm = document.getElementById('registerForm');
 
     function getFeedbackElement(input) {
-        var fieldWrapper = input.closest('.mb-3');
-        var feedback = fieldWrapper.querySelector('.client-invalid-feedback');
+        const fieldWrapper = input.closest('.mb-3');
+        let feedback = fieldWrapper.querySelector('.client-invalid-feedback');
 
         if (!feedback) {
             feedback = document.createElement('div');
@@ -84,37 +84,37 @@
     }
 
     function setRegisterFieldState(input, isValid, message) {
-        var feedback = getFeedbackElement(input);
+        const feedback = getFeedbackElement(input);
         feedback.textContent = message || '';
         input.classList.toggle('is-invalid', !isValid);
         input.classList.toggle('is-valid', isValid && input.value.trim().length > 0);
     }
 
     function validateRequired(input, message) {
-        var isValid = input.value.trim().length > 0;
+        const isValid = input.value.trim().length > 0;
         setRegisterFieldState(input, isValid, message);
         return isValid;
     }
 
     function validateName(input, message) {
-        var value = input.value.trim();
-        var isValid = value.length >= 2;
+        const value = input.value.trim();
+        const isValid = value.length >= 2;
         setRegisterFieldState(input, isValid, message);
         return isValid;
     }
 
     function validateUsername(input) {
-        var value = input.value.trim();
-        var isValid = /^[A-Za-z0-9_@.+-]{3,150}$/.test(value);
+        const value = input.value.trim();
+        const isValid = /^[A-Za-z0-9_@.+-]{3,150}$/.test(value);
         setRegisterFieldState(input, isValid, 'Потребителското име трябва да е поне 3 символа и да съдържа само латински букви, цифри и стандартни символи.');
         return isValid;
     }
 
     function validateEmail(input) {
-        var value = input.value.trim();
-        var isLatinOnly = /^[A-Za-z0-9._%+\-@]+$/.test(value);
-        var hasValidFormat = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/.test(value);
-        var isValid = isLatinOnly && hasValidFormat;
+        const value = input.value.trim();
+        const isLatinOnly = /^[A-Za-z0-9._%+\-@]+$/.test(value);
+        const hasValidFormat = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/.test(value);
+        const isValid = isLatinOnly && hasValidFormat;
         setRegisterFieldState(input, isValid, 'Имейлът трябва да бъде валиден и изписан с латински букви.');
         return isValid;
     }
@@ -122,17 +122,17 @@
     function validatePhone() {
         if (!countrySelect || !phoneInput) return true;
 
-        var rule = rules[countrySelect.value];
+        const rule = rules[countrySelect.value];
         if (!rule) return true;
 
-        var digits = phoneInput.value.replace(/\D/g, '');
-        var prefixDigits = rule.prefix.replace(/\D/g, '');
+        let digits = phoneInput.value.replace(/\D/g, '');
+        const prefixDigits = rule.prefix.replace(/\D/g, '');
 
         if (digits.indexOf(prefixDigits) === 0) {
             digits = digits.slice(prefixDigits.length);
         }
 
-        var isValid = digits.length === Number(rule.digits);
+        const isValid = digits.length === Number(rule.digits);
         setRegisterFieldState(
             phoneInput,
             isValid,
@@ -142,21 +142,21 @@
     }
 
     function validatePassword(passwordInput) {
-        var isValid = passwordInput.value.length >= 8;
+        const isValid = passwordInput.value.length >= 8;
         setRegisterFieldState(passwordInput, isValid, 'Паролата трябва да съдържа поне 8 символа.');
         return isValid;
     }
 
     function validatePasswordMatch(passwordInput, confirmInput) {
-        var isValid = confirmInput.value.length > 0 && confirmInput.value === passwordInput.value;
+        const isValid = confirmInput.value.length > 0 && confirmInput.value === passwordInput.value;
         setRegisterFieldState(confirmInput, isValid, 'Двете пароли трябва да съвпадат.');
         return isValid;
     }
 
+    let rules = {};
     if (countrySelect && phoneInput) {
-        var rules = {};
         countrySelect.dataset.phoneRules.split('|').forEach(function(item) {
-            var parts = item.split(':');
+            const parts = item.split(':');
             rules[parts[0]] = {
                 prefix: parts[1],
                 digits: parts[2],
@@ -165,11 +165,11 @@
         });
 
         function updatePhoneHint() {
-            var rule = rules[countrySelect.value];
+            const rule = rules[countrySelect.value];
             if (!rule) return;
             phoneInput.placeholder = rule.example;
 
-            var helpText = phoneInput.closest('.mb-3').querySelector('.form-text');
+            const helpText = phoneInput.closest('.mb-3').querySelector('.form-text');
             if (helpText) {
                 helpText.textContent = 'Въведете ' + rule.digits + ' цифри след ' + rule.prefix + ', например ' + rule.example + '.';
             }
@@ -182,19 +182,21 @@
     }
 
     if (registerForm) {
-        var usernameInput = registerForm.querySelector('[name="username"]');
-        var firstNameInput = registerForm.querySelector('[name="first_name"]');
-        var lastNameInput = registerForm.querySelector('[name="last_name"]');
-        var emailInput = registerForm.querySelector('[name="email"]');
-        var passwordInput = registerForm.querySelector('[name="password1"]');
-        var confirmInput = registerForm.querySelector('[name="password2"]');
+        const usernameInput = registerForm.querySelector('[name="username"]');
+        const firstNameInput = registerForm.querySelector('[name="first_name"]');
+        const lastNameInput = registerForm.querySelector('[name="last_name"]');
+        const genderInput = registerForm.querySelector('[name="gender"]');
+        const emailInput = registerForm.querySelector('[name="email"]');
+        const passwordInput = registerForm.querySelector('[name="password1"]');
+        const confirmInput = registerForm.querySelector('[name="password2"]');
 
         registerForm.addEventListener('submit', function(event) {
-            var isValid = true;
+            let isValid = true;
 
             if (usernameInput) isValid = validateUsername(usernameInput) && isValid;
             if (firstNameInput) isValid = validateName(firstNameInput, 'Моля, въведете име с поне 2 символа.') && isValid;
             if (lastNameInput) isValid = validateName(lastNameInput, 'Моля, въведете фамилия с поне 2 символа.') && isValid;
+            if (genderInput) isValid = validateRequired(genderInput, 'Моля, изберете пол.') && isValid;
             if (emailInput) isValid = validateEmail(emailInput) && isValid;
             if (phoneInput) isValid = validatePhone() && isValid;
             if (passwordInput) isValid = validatePassword(passwordInput) && isValid;
@@ -209,6 +211,7 @@
         if (usernameInput) usernameInput.addEventListener('input', function() { validateUsername(usernameInput); });
         if (firstNameInput) firstNameInput.addEventListener('input', function() { validateName(firstNameInput, 'Моля, въведете име с поне 2 символа.'); });
         if (lastNameInput) lastNameInput.addEventListener('input', function() { validateName(lastNameInput, 'Моля, въведете фамилия с поне 2 символа.'); });
+        if (genderInput) genderInput.addEventListener('change', function() { validateRequired(genderInput, 'Моля, изберете пол.'); });
         if (emailInput) emailInput.addEventListener('input', function() { validateEmail(emailInput); });
         if (passwordInput) passwordInput.addEventListener('input', function() {
             validatePassword(passwordInput);
