@@ -1,8 +1,9 @@
 import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from .models import Product, TrainerProfile, Court, Booking, Sale, SaleItem, CashTransaction, ShiftClose, User
-from .forms import CustomerProfileEditForm, ProfilePhotoForm, UserRegisterForm
+from django.contrib.auth.views import LoginView
+from .models import Product, TrainerProfile, Court, Booking, Sale, SaleItem, CashTransaction, ShiftClose, Expense, User
+from .forms import CustomerProfileEditForm, ExpenseForm, ProfilePhotoForm, UserRegisterForm
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from datetime import datetime, timedelta, time
@@ -21,6 +22,15 @@ MAX_DAILY_BOOKINGS_PER_CUSTOMER = 6
 BOOKING_TIME_ZONE = ZoneInfo('Europe/Sofia')
 RECEPTION_BILL_SESSION_KEY = 'reception_bill'
 RECEPTION_SERVICE_CATEGORIES = ['game', 'rental', 'stringing', 'training']
+FINANCE_FILTER_CHOICES = [
+    ('all', 'Всички'),
+    ('drink', 'Напитки и храни'),
+    ('product', 'Стоки'),
+    ('game', 'Игра'),
+    ('rental', 'Наем'),
+    ('stringing', 'Наплитане'),
+    ('training', 'Тренировка'),
+]
 TRAINING_TYPE_LABELS = {
     'amateur': 'Любителска тренировка',
     'individual': 'Индивидуална тренировка',
@@ -147,6 +157,26 @@ def user_can_access_reception(user):
     return user.is_superuser or user.role in ['admin', 'employee']
 
 
+def user_can_access_finance(user):
+    return user.is_superuser or user.role in ['admin', 'accounting']
+
+
+def user_can_create_own_bookings(user):
+    return getattr(user, 'is_authenticated', False) and getattr(user, 'role', '') in ['customer', 'trainer']
+
+
+class RoleAwareLoginView(LoginView):
+    template_name = 'login.html'
+
+    def get_success_url(self):
+        next_url = self.get_redirect_url()
+        if next_url:
+            return next_url
+        if getattr(self.request.user, 'role', '') == 'accounting':
+            return reverse('finance')
+        return reverse('home')
+
+
 def get_reception_bill(request):
     return request.session.get(RECEPTION_BILL_SESSION_KEY, {})
 
@@ -230,6 +260,185 @@ def money_text(value):
     return f"{(value or Decimal('0.00')):.2f}"
 
 
+def signed_money_text(value):
+    value = value or Decimal('0.00')
+    return f"{value:.2f}"
+
+
+def decimal_percent_change(current_value, previous_value):
+    current_value = current_value or Decimal('0.00')
+    previous_value = previous_value or Decimal('0.00')
+    if previous_value == 0:
+        if current_value == 0:
+            return None
+        return Decimal('100.00')
+    return ((current_value - previous_value) / previous_value) * Decimal('100.00')
+
+
+def build_comparison_data(current_value, previous_value):
+    current_value = current_value or Decimal('0.00')
+    previous_value = previous_value or Decimal('0.00')
+    delta = current_value - previous_value
+    percent = decimal_percent_change(current_value, previous_value)
+    if delta > 0:
+        direction = 'up'
+        label = 'Ръст'
+    elif delta < 0:
+        direction = 'down'
+        label = 'Спад'
+    else:
+        direction = 'same'
+        label = 'Без промяна'
+
+    return {
+        'current': current_value,
+        'previous': previous_value,
+        'delta': delta,
+        'percent': percent,
+        'direction': direction,
+        'label': label,
+    }
+
+
+def build_payment_breakdown(sales_queryset):
+    cash_total = money_sum(sales_queryset.filter(payment_method='cash'))
+    card_total = money_sum(sales_queryset.filter(payment_method='card'))
+    cash_count = sales_queryset.filter(payment_method='cash').count()
+    card_count = sales_queryset.filter(payment_method='card').count()
+    total = cash_total + card_total
+
+    return [
+        {
+            'key': 'cash',
+            'label': 'В брой',
+            'total': cash_total,
+            'count': cash_count,
+            'share': (cash_total / total * Decimal('100.00')) if total else Decimal('0.00'),
+        },
+        {
+            'key': 'card',
+            'label': 'С карта',
+            'total': card_total,
+            'count': card_count,
+            'share': (card_total / total * Decimal('100.00')) if total else Decimal('0.00'),
+        },
+    ]
+
+
+def get_previous_period_bounds(start, end):
+    period_delta = end - start
+    return start - period_delta, start
+
+
+def get_finance_filter_value(request):
+    selected_filter = request.GET.get('finance_type') or 'all'
+    valid_values = {value for value, _ in FINANCE_FILTER_CHOICES}
+    return selected_filter if selected_filter in valid_values else 'all'
+
+
+def apply_finance_type_filter(queryset, selected_filter, field_name='category'):
+    if selected_filter == 'all':
+        return queryset
+    return queryset.filter(**{field_name: selected_filter})
+
+
+def summarize_sale_items(sales_queryset, categories=None, limit=5):
+    items = (
+        SaleItem.objects
+        .filter(sale__in=sales_queryset)
+        .select_related('product')
+    )
+    if categories is not None:
+        items = items.filter(product__category__in=categories)
+
+    summary = {}
+    for item in items:
+        product = item.product
+        if not product:
+            continue
+        key = product.id
+        entry = summary.setdefault(
+            key,
+            {
+                'name': product.name,
+                'category': product.category,
+                'category_label': product.get_category_display(),
+                'quantity': 0,
+                'total': Decimal('0.00'),
+            },
+        )
+        entry['quantity'] += item.quantity
+        entry['total'] += item.quantity * item.price_at_sale
+
+    results = sorted(
+        summary.values(),
+        key=lambda value: (value['quantity'], value['total']),
+        reverse=True,
+    )
+    return results[:limit]
+
+
+def build_top_trainers(start, end, limit=5):
+    trainer_stats = {}
+    bookings = (
+        Booking.objects
+        .filter(
+            trainer__isnull=False,
+            start_time__gte=start,
+            start_time__lt=end,
+            is_active=True,
+        )
+        .select_related('trainer')
+    )
+    for booking in bookings:
+        trainer = booking.trainer
+        if not trainer:
+            continue
+        key = trainer.id
+        entry = trainer_stats.setdefault(
+            key,
+            {
+                'name': trainer.get_full_name() or trainer.username,
+                'bookings': 0,
+                'individual': 0,
+                'amateur': 0,
+            },
+        )
+        entry['bookings'] += 1
+        if booking.training_type == 'individual':
+            entry['individual'] += 1
+        elif booking.training_type == 'amateur':
+            entry['amateur'] += 1
+
+    return sorted(trainer_stats.values(), key=lambda value: value['bookings'], reverse=True)[:limit]
+
+
+def build_best_month():
+    first_sale = Sale.objects.order_by('created_at').first()
+    if not first_sale:
+        return None
+
+    now = timezone.localtime()
+    cursor = timezone.localtime(first_sale.created_at).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    last_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    best_month = None
+
+    while cursor <= last_month:
+        if cursor.month == 12:
+            next_month = cursor.replace(year=cursor.year + 1, month=1)
+        else:
+            next_month = cursor.replace(month=cursor.month + 1)
+        total = money_sum(Sale.objects.filter(created_at__gte=cursor, created_at__lt=next_month))
+        if best_month is None or total > best_month['total']:
+            best_month = {
+                'label': cursor.strftime('%m.%Y'),
+                'total': total,
+            }
+        cursor = next_month
+
+    return best_month
+
+
 def build_shift_report_snapshot(shift_start, end=None):
     end = end or timezone.now()
     sales = list(
@@ -243,6 +452,12 @@ def build_shift_report_snapshot(shift_start, end=None):
         .filter(created_at__gte=shift_start, created_at__lt=end)
         .order_by('-created_at')
     )
+    expenses = list(
+        Expense.objects
+        .filter(created_at__gte=shift_start, created_at__lt=end)
+        .select_related('created_by')
+        .order_by('-created_at')
+    )
 
     product_summary = {}
     service_summary = {}
@@ -252,7 +467,7 @@ def build_shift_report_snapshot(shift_start, end=None):
         serialized_items = []
         for item in sale.saleitem_set.all():
             product = item.product
-            item_name = product.name if product else 'Изтрит продукт'
+            item_name = product.name if product else '\u0418\u0437\u0442\u0440\u0438\u0442 \u043f\u0440\u043e\u0434\u0443\u043a\u0442'
             category = product.category if product else ''
             category_label = product.get_category_display() if product else '-'
             line_total = item.price_at_sale * item.quantity
@@ -301,6 +516,8 @@ def build_shift_report_snapshot(shift_start, end=None):
     cash_total = sum((sale.total_amount for sale in sales if sale.payment_method == 'cash'), Decimal('0.00'))
     card_total = sum((sale.total_amount for sale in sales if sale.payment_method == 'card'), Decimal('0.00'))
     sales_total = cash_total + card_total
+    expense_total = sum((item.amount for item in expenses), Decimal('0.00'))
+    profit_total = sales_total - expense_total
     cash_balance = sum((item.amount for item in cash_transactions), Decimal('0.00'))
 
     return {
@@ -312,14 +529,28 @@ def build_shift_report_snapshot(shift_start, end=None):
             'sales_total': money_text(sales_total),
             'cash_total': money_text(cash_total),
             'card_total': money_text(card_total),
+            'expense_total': money_text(expense_total),
+            'profit_total': money_text(profit_total),
             'cash_balance': money_text(cash_balance),
         },
         'sales_count': len(sales),
+        'expenses_count': len(expenses),
         'cash_transactions_count': len(cash_transactions),
         'attendance': attendance_sum(shift_start, end),
         'sales': serialized_sales,
         'product_summary': serialize_summary(product_summary),
         'service_summary': serialize_summary(service_summary),
+        'expenses': [
+            {
+                'time': timezone.localtime(item.created_at).strftime('%d.%m.%Y %H:%M'),
+                'title': item.title,
+                'category': item.get_category_display(),
+                'payment_method': item.get_payment_method_display(),
+                'amount': money_text(item.amount),
+                'comment': item.comment or '-',
+            }
+            for item in expenses
+        ],
         'cash_transactions': [
             {
                 'time': timezone.localtime(item.created_at).strftime('%d.%m.%Y %H:%M'),
@@ -331,10 +562,17 @@ def build_shift_report_snapshot(shift_start, end=None):
         ],
     }
 
-
 def get_current_shift_start(today_start):
     last_close = ShiftClose.objects.filter(closed_at__gte=today_start).order_by('-closed_at').first()
     return last_close.closed_at if last_close else today_start
+
+
+def has_reception_activity_since_last_close(today_start):
+    shift_start = get_current_shift_start(today_start)
+    has_sales = Sale.objects.filter(created_at__gte=shift_start).exists()
+    has_cash_transactions = CashTransaction.objects.filter(created_at__gte=shift_start).exists()
+    has_expenses = Expense.objects.filter(created_at__gte=shift_start).exists()
+    return has_sales or has_cash_transactions or has_expenses
 
 
 def build_reception_reports_context(request):
@@ -343,6 +581,7 @@ def build_reception_reports_context(request):
     selected_month_value = request.GET.get('report_month') or current_month_start.strftime('%Y-%m')
     selected_year_value = request.GET.get('report_year') or str(current_year_start.year)
     selected_archive_value = request.GET.get('archive_date') or ''
+    selected_finance_filter = get_finance_filter_value(request)
 
     try:
         selected_day_year, selected_day_month, selected_day = [int(part) for part in selected_day_value.split('-')]
@@ -355,18 +594,24 @@ def build_reception_reports_context(request):
         selected_month_year, selected_month = [int(part) for part in selected_month_value.split('-')]
         month_start, month_end = get_month_bounds(selected_month_year, selected_month)
     except (TypeError, ValueError):
-        month_start, month_end = current_month_start, get_month_bounds(current_month_start.year, current_month_start.month)[1]
+        month_start = current_month_start
+        month_end = get_month_bounds(current_month_start.year, current_month_start.month)[1]
         selected_month_value = current_month_start.strftime('%Y-%m')
 
     try:
         selected_year = int(selected_year_value)
         year_start, year_end = get_year_bounds(selected_year)
     except (TypeError, ValueError):
-        year_start, year_end = current_year_start, get_year_bounds(current_year_start.year)[1]
+        year_start = current_year_start
+        year_end = get_year_bounds(current_year_start.year)[1]
         selected_year = current_year_start.year
 
     first_sale = Sale.objects.order_by('created_at').first()
-    first_year = timezone.localtime(first_sale.created_at).year if first_sale else current_year_start.year
+    first_expense = Expense.objects.order_by('created_at').first()
+    first_record = first_sale or first_expense
+    if first_sale and first_expense:
+        first_record = first_sale if first_sale.created_at <= first_expense.created_at else first_expense
+    first_year = timezone.localtime(first_record.created_at).year if first_record else current_year_start.year
     report_years = range(current_year_start.year, first_year - 1, -1)
 
     shift_start = get_current_shift_start(today_start)
@@ -381,11 +626,35 @@ def build_reception_reports_context(request):
     year_sales = Sale.objects.filter(created_at__gte=year_start, created_at__lt=year_end)
     daily_cash_transactions = CashTransaction.objects.filter(created_at__gte=daily_start, created_at__lt=day_end)
     current_cash_transactions = CashTransaction.objects.filter(created_at__gte=shift_start)
+    daily_expenses_queryset = Expense.objects.filter(created_at__gte=daily_start, created_at__lt=day_end)
+    current_shift_expenses_queryset = Expense.objects.filter(created_at__gte=shift_start)
+    month_expenses = Expense.objects.filter(created_at__gte=month_start, created_at__lt=month_end)
+    year_expenses = Expense.objects.filter(created_at__gte=year_start, created_at__lt=year_end)
     daily_sales = list(daily_sales_queryset.prefetch_related('saleitem_set__product').order_by('-created_at'))
     current_shift_report = build_shift_report_snapshot(shift_start)
 
+    previous_day_start, previous_day_end = get_previous_period_bounds(day_start, day_end)
+    previous_month_start, previous_month_end = get_previous_period_bounds(month_start, month_end)
+    previous_year_start, previous_year_end = get_previous_period_bounds(year_start, year_end)
+
+    daily_sales_total = money_sum(daily_sales_queryset)
+    daily_expense_total = money_sum(daily_expenses_queryset, 'amount')
+    month_sales_total = money_sum(month_sales)
+    month_expense_total = money_sum(month_expenses, 'amount')
+    year_sales_total = money_sum(year_sales)
+    year_expense_total = money_sum(year_expenses, 'amount')
+    current_sales_total = money_sum(current_shift_sales)
+    current_expense_total = money_sum(current_shift_expenses_queryset, 'amount')
+
+    previous_day_sales_total = money_sum(Sale.objects.filter(created_at__gte=previous_day_start, created_at__lt=previous_day_end))
+    previous_day_expense_total = money_sum(Expense.objects.filter(created_at__gte=previous_day_start, created_at__lt=previous_day_end), 'amount')
+    previous_month_sales_total = money_sum(Sale.objects.filter(created_at__gte=previous_month_start, created_at__lt=previous_month_end))
+    previous_month_expense_total = money_sum(Expense.objects.filter(created_at__gte=previous_month_start, created_at__lt=previous_month_end), 'amount')
+    previous_year_sales_total = money_sum(Sale.objects.filter(created_at__gte=previous_year_start, created_at__lt=previous_year_end))
+    previous_year_expense_total = money_sum(Expense.objects.filter(created_at__gte=previous_year_start, created_at__lt=previous_year_end), 'amount')
+
     archive_is_filtered = False
-    selected_archive_label = 'последни 30 приключвания'
+    selected_archive_label = '\u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0442\u0435 30 \u043f\u0440\u0438\u043a\u043b\u044e\u0447\u0432\u0430\u043d\u0438\u044f'
     shift_close_archive_queryset = ShiftClose.objects.order_by('-closed_at')
     if selected_archive_value:
         try:
@@ -398,42 +667,96 @@ def build_reception_reports_context(request):
             selected_archive_value = ''
 
     shift_close_archive = shift_close_archive_queryset[:30]
+    low_stock_products = Product.objects.filter(quantity__isnull=False, quantity__lte=5).exclude(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('quantity', 'name')
+
+    filtered_products_queryset = apply_finance_type_filter(
+        Product.objects.exclude(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('category', 'name'),
+        selected_finance_filter,
+    )
+    filtered_services_queryset = apply_finance_type_filter(
+        Product.objects.filter(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('category', 'name'),
+        selected_finance_filter,
+    )
+    filtered_sales_history = (
+        Sale.objects
+        .select_related('cashier')
+        .prefetch_related('saleitem_set__product')
+        .order_by('-created_at')
+    )
+    if selected_finance_filter != 'all':
+        filtered_sales_history = filtered_sales_history.filter(saleitem__product__category=selected_finance_filter).distinct()
+
+    strongest_month = build_best_month()
+    month_top_products = summarize_sale_items(month_sales, categories=['drink', 'product'], limit=5)
+    month_top_services = summarize_sale_items(month_sales, categories=RECEPTION_SERVICE_CATEGORIES, limit=5)
+    month_top_trainers = build_top_trainers(month_start, month_end, limit=5)
 
     return {
         'cash_balance': money_sum(current_cash_transactions, 'amount'),
-        'current_sales_total': money_sum(current_shift_sales),
+        'current_sales_total': current_sales_total,
+        'current_expense_total': current_expense_total,
+        'current_profit_total': current_sales_total - current_expense_total,
         'current_card_sales_total': money_sum(current_shift_sales.filter(payment_method='card')),
-        'today_sales_total': money_sum(daily_sales_queryset),
+        'today_sales_total': daily_sales_total,
+        'today_expense_total': daily_expense_total,
+        'today_profit_total': daily_sales_total - daily_expense_total,
         'today_cash_sales_total': money_sum(daily_sales_queryset.filter(payment_method='cash')),
         'today_card_sales_total': money_sum(daily_sales_queryset.filter(payment_method='card')),
         'today_sales_count': daily_sales_queryset.count(),
         'today_attendance': attendance_sum(daily_start, day_end),
         'daily_cash_balance': money_sum(daily_cash_transactions, 'amount'),
+        'daily_payment_breakdown': build_payment_breakdown(daily_sales_queryset),
+        'daily_sales_comparison': build_comparison_data(daily_sales_total, previous_day_sales_total),
+        'daily_expense_comparison': build_comparison_data(daily_expense_total, previous_day_expense_total),
+        'daily_profit_comparison': build_comparison_data(daily_sales_total - daily_expense_total, previous_day_sales_total - previous_day_expense_total),
         'selected_day_value': selected_day_value,
         'selected_day_label': day_start.strftime('%d.%m.%Y'),
         'current_shift_start': shift_start,
-        'month_sales_total': money_sum(month_sales),
+        'month_sales_total': month_sales_total,
+        'month_expense_total': month_expense_total,
+        'month_profit_total': month_sales_total - month_expense_total,
         'month_sales_count': month_sales.count(),
         'month_attendance': attendance_sum(month_start, month_end),
+        'month_payment_breakdown': build_payment_breakdown(month_sales),
+        'month_sales_comparison': build_comparison_data(month_sales_total, previous_month_sales_total),
+        'month_expense_comparison': build_comparison_data(month_expense_total, previous_month_expense_total),
+        'month_profit_comparison': build_comparison_data(month_sales_total - month_expense_total, previous_month_sales_total - previous_month_expense_total),
         'selected_month_value': selected_month_value,
         'selected_month_label': month_start.strftime('%m.%Y'),
-        'year_sales_total': money_sum(year_sales),
+        'year_sales_total': year_sales_total,
+        'year_expense_total': year_expense_total,
+        'year_profit_total': year_sales_total - year_expense_total,
         'year_sales_count': year_sales.count(),
         'year_attendance': attendance_sum(year_start, year_end),
+        'year_payment_breakdown': build_payment_breakdown(year_sales),
+        'year_sales_comparison': build_comparison_data(year_sales_total, previous_year_sales_total),
+        'year_expense_comparison': build_comparison_data(year_expense_total, previous_year_expense_total),
+        'year_profit_comparison': build_comparison_data(year_sales_total - year_expense_total, previous_year_sales_total - previous_year_expense_total),
         'selected_year': selected_year,
         'report_years': report_years,
         'recent_sales': daily_sales[:5],
         'daily_sales': daily_sales,
         'daily_sales_has_more': len(daily_sales) > 5,
         'cash_transactions': current_cash_transactions.order_by('-created_at')[:20],
+        'current_shift_expenses': current_shift_expenses_queryset.order_by('-created_at')[:15],
+        'recent_expenses': Expense.objects.select_related('created_by').order_by('-created_at')[:15],
         'recent_shift_closes': ShiftClose.objects.filter(closed_at__gte=day_start, closed_at__lt=day_end).order_by('-closed_at'),
         'current_shift_report': current_shift_report,
         'shift_close_archive': shift_close_archive,
         'selected_archive_value': selected_archive_value,
         'selected_archive_label': selected_archive_label,
         'archive_is_filtered': archive_is_filtered,
+        'selected_finance_filter': selected_finance_filter,
+        'finance_filter_choices': FINANCE_FILTER_CHOICES,
+        'filtered_sales_history': filtered_sales_history[:15],
+        'filtered_products': filtered_products_queryset,
+        'filtered_services': filtered_services_queryset,
+        'low_stock_products': low_stock_products,
+        'strongest_month': strongest_month,
+        'month_top_products': month_top_products,
+        'month_top_services': month_top_services,
+        'month_top_trainers': month_top_trainers,
     }
-
 
 def redirect_back_to_reception(request):
     tab = request.POST.get('active_tab') or request.GET.get('tab')
@@ -442,8 +765,22 @@ def redirect_back_to_reception(request):
     return redirect(request.META.get('HTTP_REFERER', 'reception'))
 
 
+def redirect_back_to_finance(request):
+    params = {}
+    for key in ['report_date', 'report_month', 'report_year', 'archive_date', 'finance_type']:
+        value = request.POST.get(key) or request.GET.get(key)
+        if value:
+            params[key] = value
+    if params:
+        return redirect(f"{reverse('finance')}?{urlencode(params)}")
+    return redirect('finance')
+
+
 # --- 1. НАЧАЛНА СТРАНИЦА ---
 def home(request):
+    if request.user.is_authenticated and request.user.role == 'accounting':
+        return redirect('finance')
+
     public_price_names = ['Игра за 1 час', 'Наем на ракета', 'Наем на перо']
     products = Product.objects.filter(name__in=public_price_names)
     products = sorted(products, key=lambda product: public_price_names.index(product.name))
@@ -511,6 +848,8 @@ def schedule(request):
         'max_booking_date': max_booking_date,
         'can_go_prev_day': selected_date > min_booking_date,
         'can_go_next_day': selected_date < max_booking_date,
+        'can_direct_booking': (not request.user.is_authenticated) or user_can_create_own_bookings(request.user),
+        'show_booking_access_notice': request.user.is_authenticated and not user_can_create_own_bookings(request.user),
         'can_view_customer_names': (
             request.user.is_authenticated
             and request.user.role in ['admin', 'employee']
@@ -551,6 +890,10 @@ def make_booking(request):
             else:
                 messages.error(request, 'Нямате права да запазвате час за друг клиент.')
                 return redirect(request.META.get('HTTP_REFERER', 'schedule'))
+
+        elif not user_can_create_own_bookings(request.user):
+            messages.error(request, 'Този профил няма достъп до директни резервации на кортове.')
+            return redirect(request.META.get('HTTP_REFERER', 'schedule'))
 
         if not is_date_in_booking_window(date_obj, customer):
             messages.error(request, 'Можете да запазвате часове само в позволения период за този профил.')
@@ -648,6 +991,9 @@ def booking_login_required(request):
 # --- 5. ПРОФИЛ ---
 @login_required
 def profile(request):
+    if request.user.role == 'accounting':
+        return redirect('finance')
+
     customer_edit_form = None
     photo_form = None
 
@@ -677,6 +1023,7 @@ def profile(request):
             messages.error(request, 'Не успяхме да обновим снимката. Проверете избраните данни.')
 
     is_trainer_profile = request.user.role == 'trainer'
+    is_accounting_profile = request.user.role == 'accounting'
     if is_trainer_profile:
         bookings = (
             Booking.objects
@@ -684,6 +1031,8 @@ def profile(request):
             .select_related('court', 'customer', 'trainer')
             .order_by('-start_time')
         )
+    elif is_accounting_profile:
+        bookings = Booking.objects.none()
     else:
         bookings = (
             Booking.objects
@@ -701,10 +1050,81 @@ def profile(request):
         'bookings': bookings,
         'now': timezone.now(),
         'is_trainer_profile': is_trainer_profile,
+        'is_accounting_profile': is_accounting_profile,
         'customer_edit_form': customer_edit_form,
         'photo_form': photo_form,
     }
     return render(request, 'profile.html', context)
+
+
+@login_required
+def finance(request):
+    if not user_can_access_finance(request.user):
+        return redirect('home')
+
+    reports_context = build_reception_reports_context(request)
+    expense_form = ExpenseForm()
+
+    context = {
+        **reports_context,
+        'products': Product.objects.exclude(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('category', 'name'),
+        'services': Product.objects.filter(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('category', 'name'),
+        'sales_history': (
+            Sale.objects
+            .select_related('cashier')
+            .prefetch_related('saleitem_set__product')
+            .order_by('-created_at')[:15]
+        ),
+        'cash_movements': reports_context['cash_transactions'],
+        'expense_form': expense_form,
+    }
+    return render(request, 'finance.html', context)
+
+
+@login_required
+def add_expense(request):
+    if not user_can_access_finance(request.user):
+        return redirect('home')
+
+    if request.method != 'POST':
+        return redirect_back_to_finance(request)
+
+    form = ExpenseForm(request.POST)
+    if not form.is_valid():
+        for error in form.errors.values():
+            for message_text in error:
+                messages.error(request, message_text)
+        return redirect_back_to_finance(request)
+
+    expense = form.save(commit=False)
+    expense.created_by = request.user
+
+    today_start, _, _ = get_report_periods()
+    shift_start = get_current_shift_start(today_start)
+    current_cash_balance = money_sum(
+        CashTransaction.objects.filter(created_at__gte=shift_start),
+        'amount',
+    )
+
+    if expense.payment_method == 'cash' and expense.amount > current_cash_balance:
+        messages.error(
+            request,
+            f'Не може да извадите {expense.amount:.2f} евро, защото в касата има само {current_cash_balance:.2f} евро.',
+        )
+        return redirect_back_to_finance(request)
+
+    with transaction.atomic():
+        expense.save()
+        if expense.payment_method == 'cash':
+            CashTransaction.objects.create(
+                cashier=request.user,
+                transaction_type='out',
+                amount=-expense.amount,
+                comment=f'Разход: {expense.title}',
+            )
+
+    messages.success(request, 'Разходът е добавен успешно.')
+    return redirect_back_to_finance(request)
 
 # --- 6. ОТКАЗ НА РЕЗЕРВАЦИЯ ---
 @login_required
@@ -1091,20 +1511,7 @@ def reception_exit(request):
         return redirect('reception')
 
     today_start, _, _ = get_report_periods()
-    last_close = ShiftClose.objects.filter(closed_at__gte=today_start).order_by('-closed_at').first()
-    latest_sale = Sale.objects.filter(created_at__gte=today_start).order_by('-created_at').first()
-    latest_cash_transaction = CashTransaction.objects.filter(created_at__gte=today_start).order_by('-created_at').first()
-
-    has_activity_after_close = (
-        not last_close
-        or (latest_sale and latest_sale.created_at > last_close.closed_at)
-        or (
-            latest_cash_transaction
-            and latest_cash_transaction.created_at > last_close.closed_at
-        )
-    )
-
-    if has_activity_after_close:
+    if has_reception_activity_since_last_close(today_start):
         messages.error(request, 'Първо трябва да приключите деня, преди да излезете от рецепцията.')
         return redirect('reception')
 

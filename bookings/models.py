@@ -12,10 +12,11 @@ class User(AbstractUser):
     profile_photo = models.ImageField(upload_to='profiles/', blank=True, null=True, verbose_name="Профилна снимка")
     
     ROLE_CHOICES = (
-        ('customer', 'Клиент'),
-        ('trainer', 'Треньор'),
-        ('employee', 'Служител'),
-        ('admin', 'Администратор'),
+        ('customer', '\u041a\u043b\u0438\u0435\u043d\u0442'),
+        ('trainer', '\u0422\u0440\u0435\u043d\u044c\u043e\u0440'),
+        ('employee', '\u0421\u043b\u0443\u0436\u0438\u0442\u0435\u043b'),
+        ('accounting', '\u0421\u0447\u0435\u0442\u043e\u0432\u043e\u0434\u0441\u0442\u0432\u043e'),
+        ('admin', '\u0410\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440'),
     )
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='customer')
 
@@ -168,3 +169,30 @@ class ShiftClose(models.Model):
 
     def __str__(self):
         return f"Приключване #{self.id} - {self.closed_at.strftime('%d.%m.%Y %H:%M')}"
+class Expense(models.Model):
+    CATEGORY_CHOICES = (
+        ('inventory', 'Доставка'),
+        ('utilities', 'Консумативи'),
+        ('rent', 'Наем'),
+        ('maintenance', 'Ремонт'),
+        ('salary', 'Заплати'),
+        ('supplier', 'Доставчик'),
+        ('other', 'Други'),
+    )
+
+    PAYMENT_METHOD_CHOICES = (
+        ('cash', 'В брой'),
+        ('card', 'С карта'),
+        ('bank', 'Банков превод'),
+    )
+
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="Създадено от")
+    title = models.CharField(max_length=120, verbose_name="Разход")
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='other', verbose_name="Категория")
+    payment_method = models.CharField(max_length=10, choices=PAYMENT_METHOD_CHOICES, default='cash', verbose_name="Начин на плащане")
+    amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Сума")
+    comment = models.CharField(max_length=200, blank=True, default='', verbose_name="Коментар")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата")
+
+    def __str__(self):
+        return f"{self.title} - {self.amount} €"

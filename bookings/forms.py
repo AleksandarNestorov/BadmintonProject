@@ -3,7 +3,7 @@ import re
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 
-from .models import User
+from .models import Expense, User
 
 
 PHONE_COUNTRY_RULES = {
@@ -269,3 +269,23 @@ class ProfilePhotoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['profile_photo'].required = False
         self.fields['profile_photo'].widget.attrs.update({'class': 'form-control'})
+
+
+class ExpenseForm(forms.ModelForm):
+    class Meta:
+        model = Expense
+        fields = ['title', 'category', 'payment_method', 'amount', 'comment']
+        labels = {
+            'title': 'Разход',
+            'category': 'Категория',
+            'payment_method': 'Начин на плащане',
+            'amount': 'Сума',
+            'comment': 'Коментар',
+        }
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Например: Доставка на напитки'}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
+            'payment_method': forms.Select(attrs={'class': 'form-select'}),
+            'amount': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01', 'placeholder': '50.00'}),
+            'comment': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Допълнителна бележка'}),
+        }

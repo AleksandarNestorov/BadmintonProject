@@ -139,6 +139,12 @@
         </div>
     </div>
 
+    {% if show_booking_access_notice %}
+        <div class="alert alert-warning mb-4">
+            Този профил няма директен достъп до резервации на кортове. За финансова работа използвайте модула „Финанси“.
+        </div>
+    {% endif %}
+
     <div class="card app-card mb-5">
         <div class="card-body p-0">
             <table class="table table-bordered text-center mb-0 align-middle data-table">
@@ -167,11 +173,15 @@
                                     <div class="p-2 w-100 slot-disabled">
                                         Свободно
                                     </div>
-                                {% else %}
+                                {% elif can_direct_booking %}
                                     <div
                                         class="p-2 w-100 slot-cell"
                                         onclick="selectSlot(this, '{{ slot.court.id }}', '{{ slot.court.name }}', '{{ slot.hour }}')"
                                     >
+                                        Свободно
+                                    </div>
+                                {% else %}
+                                    <div class="p-2 w-100 slot-disabled">
                                         Свободно
                                     </div>
                                 {% endif %}
@@ -196,7 +206,12 @@
                     При невъзможност да използвате запазения час, моля отменете резервацията поне 24 часа предварително, за да можем да освободим корта за други клиенти.
                 </div>
             {% endif %}
-            {% if user.is_authenticated %}
+            {% if show_booking_access_notice %}
+                <div class="booking-policy-note mt-2">
+                    Този профил няма директен достъп до резервации на кортове. За финансова работа използвайте модула „Финанси“.
+                </div>
+            {% endif %}
+            {% if user.is_authenticated and can_direct_booking %}
                 <div id="trainerOptionsPanel" class="trainer-booking-panel mt-2" style="display: none;">
                     <div class="row g-2 align-items-end">
                         <div class="col-md-6">
@@ -224,7 +239,7 @@
                 Премахни избора
             </button>
 
-            {% if user.is_authenticated %}
+            {% if user.is_authenticated and can_direct_booking %}
                 <form action="{% url 'make_booking' %}" method="post" class="d-flex flex-wrap align-items-center gap-2">
                     {% csrf_token %}
                     <input type="hidden" name="date" value="{{ selected_date|date:'Y-m-d' }}">
@@ -237,7 +252,7 @@
                         Запази моя избор
                     </button>
                 </form>
-            {% else %}
+            {% elif not user.is_authenticated %}
                 <a href="{% url 'booking_login_required' %}?next={{ request.get_full_path|urlencode }}" class="btn btn-brand btn-lg">
                     Влез, за да запазиш
                 </a>

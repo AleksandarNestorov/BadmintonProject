@@ -1,0 +1,15 @@
+{% if comparison %}
+    <div class="comparison-chip {{ comparison.direction }}">
+        {% if comparison.direction == 'up' %}
+            <i class="bi bi-arrow-up-right"></i>
+        {% elif comparison.direction == 'down' %}
+            <i class="bi bi-arrow-down-right"></i>
+        {% else %}
+            <i class="bi bi-dash"></i>
+        {% endif %}
+        <span>{{ comparison.label }}</span>
+        {% if comparison.percent != None %}
+            <span>{{ comparison.percent|floatformat:1 }}%</span>
+        {% endif %}
+    </div>
+{% endif %}

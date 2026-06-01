@@ -23,7 +23,12 @@
                 <strong>{{ user.get_full_name|default:user.username }}</strong>
             </span>
 
-            <a href="{% url 'schedule' %}" class="btn btn-brand btn-sm">Нов час</a>
+            {% if user.role == 'customer' or user.role == 'trainer' %}
+                <a href="{% url 'schedule' %}" class="btn btn-brand btn-sm">Нов час</a>
+            {% endif %}
+            {% if user.is_superuser or user.role == 'admin' or user.role == 'accounting' %}
+                <a href="{% url 'finance' %}" class="btn btn-brand btn-sm">Финанси</a>
+            {% endif %}
             {% if user.is_superuser or user.role == 'admin' %}
                 <a href="{% url 'admin:index' %}" class="btn btn-outline-light btn-sm">Админ панел</a>
             {% endif %}
@@ -48,10 +53,17 @@
 
     <div class="row g-4">
         <div class="col-lg-4">
-            <div class="card app-card mb-4">
-                <div class="app-card-header">
-                    <div class="section-kicker mb-1">Профил</div>
-                    <h5 class="app-card-title">Профилна снимка</h5>
+            <div class="card app-card">
+                <div class="app-card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="section-kicker mb-1">Профил</div>
+                        <h5 class="app-card-title">Моят профил</h5>
+                    </div>
+                    {% if user.role == 'customer' %}
+                        <button type="button" class="btn btn-brand btn-sm" data-bs-toggle="collapse" data-bs-target="#editProfileCollapse" aria-expanded="{% if customer_edit_form.errors %}true{% else %}false{% endif %}">
+                            Редактиране
+                        </button>
+                    {% endif %}
                 </div>
                 <div class="card-body">
                     <div class="profile-avatar-wrap text-center mb-4">
@@ -93,36 +105,15 @@
                         </div>
                     </div>
 
-                    <form method="post" enctype="multipart/form-data">
+                    <form method="post" enctype="multipart/form-data" class="mb-0" id="profilePhotoForm">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="update_photo">
                         {{ photo_form.profile_photo }}
                         {% for error in photo_form.profile_photo.errors %}
                             <div class="text-danger small mt-2">{{ error }}</div>
                         {% endfor %}
-                        <div class="text-center text-muted small mb-3">
-                            Натиснете върху снимката, за да изберете нова.
-                        </div>
-                        <div class="d-grid">
-                            <button type="submit" class="btn btn-navy">Запази снимка</button>
-                        </div>
                     </form>
-                </div>
-            </div>
 
-            <div class="card app-card">
-                <div class="app-card-header d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="section-kicker mb-1">Профил</div>
-                        <h5 class="app-card-title">Моите данни</h5>
-                    </div>
-                    {% if user.role == 'customer' %}
-                        <button type="button" class="btn btn-brand btn-sm" data-bs-toggle="collapse" data-bs-target="#editProfileCollapse" aria-expanded="{% if customer_edit_form.errors %}true{% else %}false{% endif %}">
-                            Редактиране
-                        </button>
-                    {% endif %}
-                </div>
-                <div class="card-body">
                     <p><strong>Име:</strong> {{ user.get_full_name }}</p>
                     <p><strong>Потребител:</strong> {{ user.username }}</p>
                     <p><strong>Имейл:</strong> {{ user.email }}</p>
@@ -168,6 +159,8 @@
                     <h5 class="app-card-title">
                         {% if is_trainer_profile %}
                             Моите тренировки
+                        {% elif is_accounting_profile %}
+                            Финансов достъп
                         {% else %}
                             Моите резервации
                         {% endif %}
@@ -233,6 +226,8 @@
                                 <td colspan="{% if is_trainer_profile %}7{% else %}6{% endif %}" class="py-4 text-muted">
                                     {% if is_trainer_profile %}
                                         Все още няма записани тренировки към този профил.
+                                    {% elif is_accounting_profile %}
+                                        Този профил няма директен достъп до резервации. Използвайте <a href="{% url 'finance' %}">модула Финанси</a>.
                                     {% else %}
                                         Нямате записани часове. <a href="{% url 'schedule' %}">Запазете сега!</a>
                                     {% endif %}
@@ -283,7 +278,8 @@
     (function () {
         const trigger = document.getElementById('profilePhotoTrigger');
         const input = document.getElementById('id_profile_photo');
-        if (!trigger || !input) {
+        const form = document.getElementById('profilePhotoForm');
+        if (!trigger || !input || !form) {
             return;
         }
 
@@ -324,6 +320,10 @@
                 currentPreview.replaceWith(image);
             };
             reader.readAsDataURL(file);
+
+            setTimeout(function () {
+                form.submit();
+            }, 50);
         });
     })();
 </script>

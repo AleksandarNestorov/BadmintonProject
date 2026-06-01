@@ -12,9 +12,11 @@ urlpatterns = [
     path('', views.home, name='home'),
     path('register/', views.register, name='register'),
     path('profile/', views.profile, name='profile'),
+    path('finance/', views.finance, name='finance'),
+    path('finance/expenses/add/', views.add_expense, name='add_expense'),
 
     # --- ВХОД И ИЗХОД ---
-    path('login/', auth_views.LoginView.as_view(template_name='login.html'), name='login'),
+    path('login/', views.RoleAwareLoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(template_name='logout.html'), name='logout'),
     path(
         'password-reset/',

@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Финанси</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    {% load static %}
+    <link href="{% static 'css/site-ui.css' %}" rel="stylesheet">
+    <style>
+        .finance-stat {
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.96));
+            color: #fff;
+            border-radius: 8px;
+            padding: 1.15rem;
+            min-height: 136px;
+            box-shadow: 0 1rem 2rem rgba(15, 23, 42, 0.12);
+        }
+        .finance-stat-label {
+            color: rgba(255, 255, 255, 0.72);
+            font-size: 0.78rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04rem;
+        }
+        .finance-stat-value {
+            font-size: 1.95rem;
+            font-weight: 900;
+            line-height: 1.05;
+            margin-top: 0.65rem;
+        }
+        .finance-muted {
+            color: #64748b;
+        }
+        .finance-table-wrap {
+            max-height: 360px;
+            overflow: auto;
+        }
+        .finance-table-wrap thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #f8fafc;
+        }
+        .finance-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            background: #eef2ff;
+            color: #1e3a8a;
+            border-radius: 999px;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.78rem;
+            font-weight: 800;
+        }
+        .comparison-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            border-radius: 999px;
+            padding: 0.2rem 0.55rem;
+            font-size: 0.74rem;
+            font-weight: 800;
+        }
+        .comparison-chip.up {
+            background: rgba(22, 163, 74, 0.14);
+            color: #166534;
+        }
+        .comparison-chip.down {
+            background: rgba(220, 38, 38, 0.14);
+            color: #991b1b;
+        }
+        .comparison-chip.same {
+            background: rgba(100, 116, 139, 0.14);
+            color: #475569;
+        }
+        .sale-items-list {
+            display: grid;
+            gap: 0.28rem;
+        }
+        .sale-item-line {
+            color: #334155;
+            font-size: 0.88rem;
+        }
+        .archive-meta {
+            color: #64748b;
+            font-size: 0.88rem;
+        }
+        .insight-list {
+            display: grid;
+            gap: 0.7rem;
+        }
+        .insight-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+            padding-bottom: 0.55rem;
+        }
+        .insight-row:last-child {
+            border-bottom: 0;
+            padding-bottom: 0;
+        }
+        .low-stock-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            border-radius: 999px;
+            padding: 0.2rem 0.5rem;
+            font-size: 0.74rem;
+            font-weight: 800;
+            background: rgba(220, 38, 38, 0.12);
+            color: #b91c1c;
+        }
+        .finance-filter-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.55rem;
+        }
+        .finance-filter-bar .btn {
+            border-radius: 999px;
+        }
+        .mini-stat {
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+            background: #fff;
+            padding: 0.85rem 0.95rem;
+        }
+        .mini-stat-label {
+            color: #64748b;
+            font-size: 0.75rem;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+        .mini-stat-value {
+            font-size: 1.35rem;
+            font-weight: 900;
+            margin-top: 0.35rem;
+        }
+        .expense-form-grid {
+            display: grid;
+            grid-template-columns: repeat(12, minmax(0, 1fr));
+            gap: 0.9rem;
+        }
+        .expense-form-grid > div:nth-child(1) { grid-column: span 4; }
+        .expense-form-grid > div:nth-child(2) { grid-column: span 3; }
+        .expense-form-grid > div:nth-child(3) { grid-column: span 3; }
+        .expense-form-grid > div:nth-child(4) { grid-column: span 2; }
+        .expense-form-grid > div:nth-child(5) { grid-column: span 12; }
+        @media (max-width: 991px) {
+            .expense-form-grid > div {
+                grid-column: span 12 !important;
+            }
+        }
+    </style>
+</head>
+<body class="app-page">
+
+<nav class="navbar navbar-dark site-navbar">
+    <div class="container">
+        <a class="navbar-brand d-flex align-items-center" href="{% url 'home' %}">
+            <span class="brand-mark"></span>
+            <span>Бадминтон зала Юнак</span>
+        </a>
+
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            {% if user.is_superuser or user.role == 'admin' %}
+                <a href="{% url 'admin:index' %}" class="btn btn-outline-light btn-sm">Админ панел</a>
+            {% endif %}
+            <form action="{% url 'logout' %}" method="post" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-light btn-sm">Изход</button>
+            </form>
+        </div>
+    </div>
+</nav>
+
+<div class="container page-shell">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+        <div>
+            <div class="section-kicker mb-2">Финансов модул</div>
+            <h1 class="page-title mb-2">Отчети, разходи и наличности</h1>
+            <div class="finance-muted fw-semibold">
+                Текуща смяна: {{ current_shift_start|date:"d.m.Y H:i" }}
+            </div>
+        </div>
+        <div class="finance-chip">
+            <i class="bi bi-person-badge"></i>
+            {{ user.get_full_name|default:user.username }} - {{ user.get_role_display }}
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-2">
+            <div class="finance-stat">
+                <div class="finance-stat-label">Оборот смяна</div>
+                <div class="finance-stat-value">{{ current_sales_total|floatformat:2 }} €</div>
+                <div class="small text-white-50 mt-2">{{ current_shift_report.sales_count }} продажби</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <div class="finance-stat">
+                <div class="finance-stat-label">Разходи смяна</div>
+                <div class="finance-stat-value">{{ current_expense_total|floatformat:2 }} €</div>
+                <div class="small text-white-50 mt-2">{{ current_shift_report.expenses_count }} разхода</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <div class="finance-stat">
+                <div class="finance-stat-label">Печалба смяна</div>
+                <div class="finance-stat-value">{{ current_profit_total|floatformat:2 }} €</div>
+                <div class="small text-white-50 mt-2">След приспадане на разходите</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <div class="finance-stat">
+                <div class="finance-stat-label">Плащания в брой</div>
+                <div class="finance-stat-value">{{ current_shift_report.totals.cash_total }} €</div>
+                <div class="small text-white-50 mt-2">Каса за смяната</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <div class="finance-stat">
+                <div class="finance-stat-label">Плащания с карта</div>
+                <div class="finance-stat-value">{{ current_shift_report.totals.card_total }} €</div>
+                <div class="small text-white-50 mt-2">Безналични плащания</div>
+            </div>
+        </div>
+        <div class="col-md-6 col-xl-2">
+            <div class="finance-stat">
+                <div class="finance-stat-label">Наличност в касата</div>
+                <div class="finance-stat-value">{{ cash_balance|floatformat:2 }} €</div>
+                <div class="small text-white-50 mt-2">Текуща активна сума</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-xl-8">
+            <div class="card app-card h-100">
+                <div class="app-card-header">
+                    <div class="section-kicker mb-1">Разходи</div>
+                    <h5 class="app-card-title">Добавяне на нов разход</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'add_expense' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="report_date" value="{{ selected_day_value }}">
+                        <input type="hidden" name="report_month" value="{{ selected_month_value }}">
+                        <input type="hidden" name="report_year" value="{{ selected_year }}">
+                        <input type="hidden" name="archive_date" value="{{ selected_archive_value }}">
+                        <div class="expense-form-grid">
+                            <div>
+                                <label class="form-label">{{ expense_form.title.label }}</label>
+                                {{ expense_form.title }}
+                            </div>
+                            <div>
+                                <label class="form-label">{{ expense_form.category.label }}</label>
+                                {{ expense_form.category }}
+                            </div>
+                            <div>
+                                <label class="form-label">{{ expense_form.payment_method.label }}</label>
+                                {{ expense_form.payment_method }}
+                            </div>
+                            <div>
+                                <label class="form-label">{{ expense_form.amount.label }}</label>
+                                {{ expense_form.amount }}
+                            </div>
+                            <div>
+                                <label class="form-label">{{ expense_form.comment.label }}</label>
+                                {{ expense_form.comment }}
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mt-3">
+                            <div class="finance-muted small fw-semibold">
+                                Наличност в касата към момента: {{ cash_balance|floatformat:2 }} €
+                            </div>
+                            <button type="submit" class="btn btn-brand">
+                                <i class="bi bi-plus-circle me-1"></i> Добави разход
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4">
+            <div class="card app-card h-100">
+                <div class="app-card-header">
+                    <div class="section-kicker mb-1">Ниски наличности</div>
+                    <h5 class="app-card-title">Продукти за внимание</h5>
+                </div>
+                <div class="card-body">
+                    {% if low_stock_products %}
+                        <div class="insight-list">
+                            {% for product in low_stock_products %}
+                                <div class="insight-row">
+                                    <div>
+                                        <div class="fw-bold">{{ product.name }}</div>
+                                        <div class="small text-muted">{{ product.description|default:"Без пояснение" }}</div>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="low-stock-badge">
+                                            <i class="bi bi-exclamation-triangle-fill"></i>
+                                            {{ product.quantity }} бр.
+                                        </div>
+                                        <div class="small text-muted mt-1">{{ product.price }} €</div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-muted">Няма продукти с ниска наличност.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-xl-6">
+            <div class="card app-card h-100">
+                <div class="app-card-header">
+                    <div class="section-kicker mb-1">Дневен отчет</div>
+                    <h5 class="app-card-title">Избран ден</h5>
+                </div>
+                <div class="card-body">
+                    <form method="get" action="{% url 'finance' %}" class="row g-2 align-items-end mb-3">
+                        <input type="hidden" name="report_month" value="{{ selected_month_value }}">
+                        <input type="hidden" name="report_year" value="{{ selected_year }}">
+                        <input type="hidden" name="archive_date" value="{{ selected_archive_value }}">
+                        <div class="col-sm-8">
+                            <label class="form-label">Дата</label>
+                            <input type="date" name="report_date" value="{{ selected_day_value }}" class="form-control">
+                        </div>
+                        <div class="col-sm-4 d-grid">
+                            <button type="submit" class="btn btn-brand">Покажи</button>
+                        </div>
+                    </form>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <div class="mini-stat">
+                                <div class="mini-stat-label">Оборот</div>
+                                <div class="mini-stat-value">{{ today_sales_total|floatformat:2 }} €</div>
+                                {% include "partials/comparison_chip.html" with comparison=today_sales_comparison only %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mini-stat">
+                                <div class="mini-stat-label">Разходи</div>
+                                <div class="mini-stat-value">{{ today_expense_total|floatformat:2 }} €</div>
+                                {% include "partials/comparison_chip.html" with comparison=daily_expense_comparison only %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mini-stat">
+                                <div class="mini-stat-label">Печалба</div>
+                                <div class="mini-stat-value">{{ today_profit_total|floatformat:2 }} €</div>
+                                {% include "partials/comparison_chip.html" with comparison=daily_profit_comparison only %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        {% for item in daily_payment_breakdown %}
+                            <div class="col-md-6">
+                                <div class="soft-panel p-3 h-100">
+                                    <div class="d-flex justify-content-between align-items-start gap-2">
+                                        <div>
+                                            <div class="finance-muted small fw-bold text-uppercase">{{ item.label }}</div>
+                                            <div class="h5 fw-bold mb-1">{{ item.total|floatformat:2 }} €</div>
+                                        </div>
+                                        <div class="small text-muted text-end">
+                                            {{ item.count }} плащания<br>
+                                            {{ item.share|floatformat:1 }}%
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="finance-muted">
+                        Показан ден: <strong>{{ selected_day_label }}</strong><br>
+                        Продажби: <strong>{{ today_sales_count }}</strong> ·
+                        Посещаемост: <strong>{{ today_attendance }}</strong> ·
+                        Каса за деня: <strong>{{ daily_cash_balance|floatformat:2 }} €</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3">
+            <div class="card app-card h-100">
+                <div class="app-card-header">
+                    <div class="section-kicker mb-1">Месечен отчет</div>
+                    <h5 class="app-card-title">По месец</h5>
+                </div>
+                <div class="card-body">
+                    <form method="get" action="{% url 'finance' %}" class="mb-3">
+                        <input type="hidden" name="report_date" value="{{ selected_day_value }}">
+                        <input type="hidden" name="report_year" value="{{ selected_year }}">
+                        <input type="hidden" name="archive_date" value="{{ selected_archive_value }}">
+                        <label class="form-label">Месец</label>
+                        <div class="d-grid gap-2">
+                            <input type="month" name="report_month" value="{{ selected_month_value }}" class="form-control">
+                            <button type="submit" class="btn btn-brand">Покажи</button>
+                        </div>
+                    </form>
+                    <div class="insight-list">
+                        <div class="insight-row">
+                            <span>Оборот</span>
+                            <strong>{{ month_sales_total|floatformat:2 }} €</strong>
+                        </div>
+                        <div>{% include "partials/comparison_chip.html" with comparison=month_sales_comparison only %}</div>
+                        <div class="insight-row">
+                            <span>Разходи</span>
+                            <strong>{{ month_expense_total|floatformat:2 }} €</strong>
+                        </div>
+                        <div>{% include "partials/comparison_chip.html" with comparison=month_expense_comparison only %}</div>
+                        <div class="insight-row">
+                            <span>Печалба</span>
+                            <strong>{{ month_profit_total|floatformat:2 }} €</strong>
+                        </div>
+                        <div>{% include "partials/comparison_chip.html" with comparison=month_profit_comparison only %}</div>
+                        <div class="insight-row">
+                            <span>Посещаемост</span>
+                            <strong>{{ month_attendance }}</strong>
+                        </div>
+                        <div class="insight-row">
+                            <span>Продажби</span>
+                            <strong>{{ month_sales_count }}</strong>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="small fw-bold mb-2">Разбивка по плащане</div>
+                    <div class="insight-list">
+                        {% for item in month_payment_breakdown %}
+                            <div class="insight-row">
+                                <span>{{ item.label }}</span>
+                                <strong>{{ item.total|floatformat:2 }} €</strong>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3">
+            <div class="card app-card h-100">
+                <div class="app-card-header">
+                    <div class="section-kicker mb-1">Годишен отчет</div>
+                    <h5 class="app-card-title">По година</h5>
+                </div>
+                <div class="card-body">
+                    <form method="get" action="{% url 'finance' %}" class="mb-3">
+                        <input type="hidden" name="report_date" value="{{ selected_day_value }}">
+                        <input type="hidden" name="report_month" value="{{ selected_month_value }}">
+                        <input type="hidden" name="archive_date" value="{{ selected_archive_value }}">
+                        <label class="form-label">Година</label>
+                        <div class="d-grid gap-2">
+                            <select name="report_year" class="form-select">
+                                {% for year in report_years %}
+                                    <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="btn btn-brand">Покажи</button>
+                        </div>
+                    </form>
+                    <div class="insight-list">
+                        <div class="insight-row">
+                            <span>Оборот</span>
+                            <strong>{{ year_sales_total|floatformat:2 }} €</strong>
+                        </div>
+                        <div>{% include "partials/comparison_chip.html" with comparison=year_sales_comparison only %}</div>
+                        <div class="insight-row">
+                            <span>Разходи</span>
+                            <strong>{{ year_expense_total|floatformat:2 }} €</strong>
+                        </div>
+                        <div>{% include "partials/comparison_chip.html" with comparison=year_expense_comparison only %}</div>
+                        <div class="insight-row">
+                            <span>Печалба</span>
+                            <strong>{{ year_profit_total|floatformat:2 }} €</strong>
+                        </div>
+                        <div>{% include "partials/comparison_chip.html" with comparison=year_profit_comparison only %}</div>
+                        <div class="insight-row">
+                            <span>Посещаемост</span>
+                            <strong>{{ year_attendance }}</strong>
+                        </div>
+                        <div class="insight-row">
+                            <span>Продажби</span>
+                            <strong>{{ year_sales_count }}</strong>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="small fw-bold mb-2">Разбивка по плащане</div>
+                    <div class="insight-list">
+                        {% for item in year_payment_breakdown %}
+                            <div class="insight-row">
+                                <span>{{ item.label }}</span>
+                                <strong>{{ item.total|floatformat:2 }} €</strong>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-xl-4">
+            <div class="card app-card h-100">
+                <div class="app-card-header">
+                    <div class="section-kicker mb-1">Анализи</div>
+                    <h5 class="app-card-title">Силен период и продукти</h5>
+                </div>
+                <div class="card-body">
+                    <div class="soft-panel p-3 mb-3">
+                        <div class="finance-muted small fw-bold text-uppercase">Най-силен месец</div>
+                        {% if strongest_month %}
+                            <div class="h5 fw-bold mb-1">{{ strongest_month.label }}</div>
+                            <div class="finance-muted">{{ strongest_month.total|floatformat:2 }} € оборот</div>
+                        {% else %}
+                            <div class="text-muted">Все още няма достатъчно данни.</div>
+                        {% endif %}
+                    </div>
+                    <div class="fw-bold mb-2">Топ продукти за {{ selected_month_label }}</div>
+                    <div class="insight-list mb-3">
+                        {% for item in month_top_products %}
+                            <div class="insight-row">
+                                <span>{{ item.name }} × {{ item.quantity }}</span>
+                                <strong>{{ item.total|floatformat:2 }} €</strong>
+                            </div>
+                        {% empty %}
+                            <div class="text-muted small">Няма продажби на продукти за този месец.</div>
+                        {% endfor %}
+                    </div>
+                    <div class="fw-bold mb-2">Топ услуги за {{ selected_month_label }}</div>
+                    <div class="insight-list">
+                        {% for item in month_top_services %}
+                            <div class="insight-row">
+                                <span>{{ item.name }} × {{ item.quantity }}</span>
+                                <strong>{{ item.total|floatformat:2 }} €</strong>
+                            </div>
+                        {% empty %}
+                            <div class="text-muted small">Няма продажби на услуги за този месец.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4">
+            <div class="card app-card h-100">
+                <div class="app-card-header">
+                    <div class="section-kicker mb-1">Треньори</div>
+                    <h5 class="app-card-title">Най-натоварени за {{ selected_month_label }}</h5>
+                </div>
+                <div class="card-body">
+                    <div class="insight-list">
+                        {% for trainer in month_top_trainers %}
+                            <div class="insight-row">
+                                <div>
+                                    <div class="fw-bold">{{ trainer.name }}</div>
+                                    <div class="small text-muted">
+                                        Любителски: {{ trainer.amateur }} · Индивидуални: {{ trainer.individual }}
+                                    </div>
+                                </div>
+                                <strong>{{ trainer.bookings }} трен.</strong>
+                            </div>
+                        {% empty %}
+                            <div class="text-muted">Няма треньорски резервации за избрания месец.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-4">
+            <div class="card app-card h-100">
+                <div class="app-card-header">
+                    <div class="section-kicker mb-1">Разходи</div>
+                    <h5 class="app-card-title">Последни разходи</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="finance-table-wrap">
+                        <table class="table table-hover mb-0 align-middle data-table">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Разход</th>
+                                    <th>Плащане</th>
+                                    <th>Сума</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for expense in recent_expenses %}
+                                    <tr>
+                                        <td>{{ expense.created_at|date:"d.m.Y H:i" }}</td>
+                                        <td class="text-start">
+                                            <div class="fw-bold">{{ expense.title }}</div>
+                                            <div class="small text-muted">{{ expense.get_category_display }}{% if expense.comment %} · {{ expense.comment }}{% endif %}</div>
+                                        </td>
+                                        <td>{{ expense.get_payment_method_display }}</td>
+                                        <td class="fw-bold">{{ expense.amount }} €</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">Все още няма добавени разходи.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-xl-7">
+            <div class="card app-card h-100">
+                <div class="app-card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="section-kicker mb-1">Продажби</div>
+                        <h5 class="app-card-title">Последни продажби</h5>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="finance-table-wrap">
+                        <table class="table table-hover mb-0 align-middle data-table">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Касиер</th>
+                                    <th>Продукти и услуги</th>
+                                    <th>Плащане</th>
+                                    <th>Сума</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for sale in sales_history %}
+                                    <tr>
+                                        <td>{{ sale.created_at|date:"d.m.Y H:i" }}</td>
+                                        <td>{{ sale.cashier.get_full_name|default:sale.cashier.username|default:"-" }}</td>
+                                        <td class="text-start">
+                                            <div class="sale-items-list">
+                                                {% for item in sale.saleitem_set.all %}
+                                                    <div class="sale-item-line">
+                                                        {{ item.product.name|default:"Изтрит продукт" }} × {{ item.quantity }}
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        </td>
+                                        <td>{{ sale.get_payment_method_display }}</td>
+                                        <td class="fw-bold">{{ sale.total_amount }} €</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-4">Няма продажби за този филтър.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-5">
+            <div class="card app-card h-100">
+                <div class="app-card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="section-kicker mb-1">Каса</div>
+                        <h5 class="app-card-title">Последни движения</h5>
+                    </div>
+                    <div class="small text-white-50">Текуща смяна</div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="finance-table-wrap">
+                        <table class="table table-hover mb-0 align-middle data-table">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>Тип</th>
+                                    <th>Коментар</th>
+                                    <th>Сума</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in cash_movements %}
+                                    <tr>
+                                        <td>{{ item.created_at|date:"d.m.Y H:i" }}</td>
+                                        <td>{{ item.get_transaction_type_display }}</td>
+                                        <td class="text-start">{{ item.comment|default:"-" }}</td>
+                                        <td class="fw-bold">{{ item.amount }} €</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">Все още няма касови движения.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-xl-6">
+            <div class="card app-card h-100">
+                <div class="app-card-header">
+                    <div class="section-kicker mb-1">Наличности</div>
+                    <h5 class="app-card-title">Продукти и стоки</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="finance-table-wrap">
+                        <table class="table table-hover mb-0 align-middle data-table">
+                            <thead>
+                                <tr>
+                                    <th>Име</th>
+                                    <th>Категория</th>
+                                    <th>Количество</th>
+                                    <th>Цена</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for product in products %}
+                                    <tr>
+                                        <td class="text-start">
+                                            <div class="fw-bold">{{ product.name }}</div>
+                                            <div class="small text-muted">{{ product.description|default:"Без пояснение" }}</div>
+                                        </td>
+                                        <td>{{ product.get_category_display }}</td>
+                                        <td>
+                                            {{ product.quantity|default:"-" }}
+                                            {% if product.quantity != None and product.quantity <= 5 %}
+                                                <span class="low-stock-badge ms-2">
+                                                    <i class="bi bi-exclamation-triangle-fill"></i>
+                                                    Ниска наличност
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="fw-bold">{{ product.price }} €</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">Няма продукти за този филтър.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-6">
+            <div class="card app-card h-100">
+                <div class="app-card-header">
+                    <div class="section-kicker mb-1">Услуги</div>
+                    <h5 class="app-card-title">Услуги и цени</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="finance-table-wrap">
+                        <table class="table table-hover mb-0 align-middle data-table">
+                            <thead>
+                                <tr>
+                                    <th>Име</th>
+                                    <th>Тип</th>
+                                    <th>Цена</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for service in services %}
+                                    <tr>
+                                        <td class="text-start">
+                                            <div class="fw-bold">{{ service.name }}</div>
+                                            <div class="small text-muted">{{ service.description|default:"Без пояснение" }}</div>
+                                        </td>
+                                        <td>{{ service.get_category_display }}</td>
+                                        <td class="fw-bold">{{ service.price }} €</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted py-4">Няма услуги за този филтър.</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card app-card">
+        <div class="app-card-header d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <div class="section-kicker mb-1">Архив</div>
+                <h5 class="app-card-title">Приключвания на деня</h5>
+            </div>
+            <form method="get" action="{% url 'finance' %}" class="d-flex flex-wrap gap-2 align-items-center">
+                <input type="hidden" name="report_date" value="{{ selected_day_value }}">
+                <input type="hidden" name="report_month" value="{{ selected_month_value }}">
+                <input type="hidden" name="report_year" value="{{ selected_year }}">
+                <input type="date" name="archive_date" value="{{ selected_archive_value }}" class="form-control form-control-sm">
+                <button type="submit" class="btn btn-brand btn-sm">Филтрирай</button>
+                <a href="{% url 'finance' %}?report_date={{ selected_day_value }}&report_month={{ selected_month_value }}&report_year={{ selected_year }}" class="btn btn-outline-light btn-sm">Нулирай</a>
+            </form>
+        </div>
+        <div class="card-body">
+            <p class="archive-meta mb-3">Показват се {{ selected_archive_label }}.</p>
+            <div class="accordion" id="financeArchiveAccordion">
+                {% for shift_close in shift_close_archive %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="financeArchiveHeading{{ shift_close.id }}">
+                            <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#financeArchiveCollapse{{ shift_close.id }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
+                                <span class="fw-bold me-3">{{ shift_close.closed_at|date:"d.m.Y H:i" }}</span>
+                                <span class="badge bg-dark me-2">{{ shift_close.sales_total }} €</span>
+                                <span class="badge bg-danger me-2">{{ shift_close.report_data.totals.expense_total|default:"0.00" }} € разходи</span>
+                                <span class="badge bg-success me-2">{{ shift_close.report_data.totals.profit_total|default:"0.00" }} € печалба</span>
+                                <span class="badge bg-primary">{{ shift_close.attendance }} посещения</span>
+                            </button>
+                        </h2>
+                        <div id="financeArchiveCollapse{{ shift_close.id }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#financeArchiveAccordion">
+                            <div class="accordion-body">
+                                <div class="row g-3 mb-3">
+                                    <div class="col-md-3">
+                                        <div class="soft-panel p-3 h-100">
+                                            <div class="finance-muted small fw-bold text-uppercase">Оборот</div>
+                                            <div class="h5 fw-bold mb-0">{{ shift_close.sales_total }} €</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="soft-panel p-3 h-100">
+                                            <div class="finance-muted small fw-bold text-uppercase">Разходи</div>
+                                            <div class="h5 fw-bold mb-0">{{ shift_close.report_data.totals.expense_total|default:"0.00" }} €</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="soft-panel p-3 h-100">
+                                            <div class="finance-muted small fw-bold text-uppercase">Печалба</div>
+                                            <div class="h5 fw-bold mb-0">{{ shift_close.report_data.totals.profit_total|default:"0.00" }} €</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="soft-panel p-3 h-100">
+                                            <div class="finance-muted small fw-bold text-uppercase">Каса</div>
+                                            <div class="h5 fw-bold mb-0">{{ shift_close.cash_balance }} €</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="archive-meta mb-3">
+                                    Касиер: {{ shift_close.cashier.get_full_name|default:shift_close.cashier.username|default:"-" }} ·
+                                    Коментар: {{ shift_close.comment|default:"-" }}
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-lg-4">
+                                        <div class="soft-panel p-3 h-100">
+                                            <div class="fw-bold mb-2">Продукти</div>
+                                            <div class="finance-table-wrap" style="max-height: 220px;">
+                                                {% if shift_close.report_data.product_summary %}
+                                                    {% for item in shift_close.report_data.product_summary %}
+                                                        <div class="d-flex justify-content-between gap-3 small mb-1">
+                                                            <span>{{ item.name }} × {{ item.quantity }}</span>
+                                                            <span class="fw-bold">{{ item.total }} €</span>
+                                                        </div>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <div class="text-muted small">Няма продукти.</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-4">
+                                        <div class="soft-panel p-3 h-100">
+                                            <div class="fw-bold mb-2">Услуги</div>
+                                            <div class="finance-table-wrap" style="max-height: 220px;">
+                                                {% if shift_close.report_data.service_summary %}
+                                                    {% for item in shift_close.report_data.service_summary %}
+                                                        <div class="d-flex justify-content-between gap-3 small mb-1">
+                                                            <span>{{ item.name }} × {{ item.quantity }}</span>
+                                                            <span class="fw-bold">{{ item.total }} €</span>
+                                                        </div>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <div class="text-muted small">Няма услуги.</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-4">
+                                        <div class="soft-panel p-3 h-100">
+                                            <div class="fw-bold mb-2">Разходи</div>
+                                            <div class="finance-table-wrap" style="max-height: 220px;">
+                                                {% if shift_close.report_data.expenses %}
+                                                    {% for item in shift_close.report_data.expenses %}
+                                                        <div class="d-flex justify-content-between gap-3 small mb-1">
+                                                            <span>{{ item.title }}</span>
+                                                            <span class="fw-bold">{{ item.amount }} €</span>
+                                                        </div>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <div class="text-muted small">Няма разходи.</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="text-center text-muted py-5">Все още няма архивирани приключвания.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
