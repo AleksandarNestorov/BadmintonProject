@@ -544,12 +544,14 @@
                 <button class="dropdown-item reset-report-btn" type="button" data-bs-toggle="modal" data-bs-target="#reportsModal" data-report-url="{% url 'reception' %}?open_report=daily">
                     <i class="fas fa-calendar-day me-2"></i> Дневен отчет
                 </button>
-                <button class="dropdown-item reset-report-btn" type="button" data-bs-toggle="modal" data-bs-target="#monthlyReportModal" data-report-url="{% url 'reception' %}?open_report=monthly">
-                    <i class="fas fa-calendar-alt me-2"></i> Месечен отчет
-                </button>
-                <button class="dropdown-item reset-report-btn" type="button" data-bs-toggle="modal" data-bs-target="#yearlyReportModal" data-report-url="{% url 'reception' %}?open_report=yearly">
-                    <i class="fas fa-calendar-check me-2"></i> Годишен отчет
-                </button>
+                {% if user.is_superuser or user.role == 'admin' %}
+                    <button class="dropdown-item reset-report-btn" type="button" data-bs-toggle="modal" data-bs-target="#monthlyReportModal" data-report-url="{% url 'reception' %}?open_report=monthly">
+                        <i class="fas fa-calendar-alt me-2"></i> Месечен отчет
+                    </button>
+                    <button class="dropdown-item reset-report-btn" type="button" data-bs-toggle="modal" data-bs-target="#yearlyReportModal" data-report-url="{% url 'reception' %}?open_report=yearly">
+                        <i class="fas fa-calendar-check me-2"></i> Годишен отчет
+                    </button>
+                {% endif %}
                 <button class="dropdown-item" type="button" data-bs-toggle="modal" data-bs-target="#cashModal">
                     <i class="fas fa-cash-register me-2"></i> Касови транзакции
                 </button>
@@ -931,16 +933,61 @@
                             </div>
                             {% if b.trainer %}
                                 <div class="small text-muted">
-                                    <i class="fas fa-user-tie me-1"></i> {{ b.trainer.get_full_name }} · {{ b.get_training_type_display }}
+                                    <i class="fas fa-user-tie me-1"></i> {{ b.trainer.get_full_name }} - {{ b.get_training_type_display }}
                                 </div>
                             {% endif %}
                         </div>
                     </div>
 
                     <div class="text-end">
-                        <a href="{% url 'cancel_booking' b.id %}" class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-bold" onclick="return confirm('Изтриване?')">
-                            <i class="fas fa-trash-alt me-1"></i> Премахни
-                        </a>
+                        <button
+                            type="button"
+                            class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-bold"
+                            data-bs-toggle="modal"
+                            data-bs-target="#staffCancelModal{{ b.id }}"
+                        >
+                            <i class="fas fa-ban me-1"></i> Отмени
+                        </button>
+                    </div>
+                </div>
+                <div class="modal fade" id="staffCancelModal{{ b.id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-dark text-white">
+                                <h5 class="modal-title">Отмяна на резервация</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <form action="{% url 'staff_cancel_booking' b.id %}" method="post">
+                                <div class="modal-body">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="active_tab" value="schedule">
+                                    <p class="mb-3">
+                                        Клиент: <strong>{{ b.customer.get_full_name|default:b.customer.username }}</strong><br>
+                                        Час: <strong>{{ b.start_time|date:"d.m.Y H:i" }}</strong><br>
+                                        Корт: <strong>{{ b.court.name }}</strong>
+                                    </p>
+                                    {% if b.trainer %}
+                                        <p class="small text-muted mb-3">
+                                            Тренировка с {{ b.trainer.get_full_name|default:b.trainer.username }} - {{ b.get_training_type_display }}
+                                        </p>
+                                    {% endif %}
+                                    <label for="staffCancelReason{{ b.id }}" class="form-label fw-bold">Причина за отмяна</label>
+                                    <textarea
+                                        id="staffCancelReason{{ b.id }}"
+                                        name="cancellation_reason"
+                                        class="form-control"
+                                        rows="4"
+                                        placeholder="Опишете накратко защо резервацията се отменя..."
+                                        required
+                                    ></textarea>
+                                    <div class="form-text">Тази причина ще се вижда от клиента в неговия профил.</div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Затвори</button>
+                                    <button type="submit" class="btn btn-danger">Потвърди отмяната</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
                 {% empty %}
@@ -1251,79 +1298,81 @@
     </div>
 </div>
 
-<div class="modal fade" id="monthlyReportModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title"><i class="fas fa-calendar-alt me-2"></i> Месечен отчет</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body bg-light">
-                <form method="get" action="{% url 'reception' %}" class="row g-2 align-items-end mb-3">
-                    <input type="hidden" name="open_report" value="monthly">
-                    <input type="hidden" name="report_date" value="{{ selected_day_value }}">
-                    <input type="hidden" name="report_year" value="{{ selected_year }}">
-                    <div class="col">
-                        <label class="form-label fw-bold">Избери месец</label>
-                        <input type="month" name="report_month" class="form-control" value="{{ selected_month_value }}">
-                    </div>
-                    <div class="col-auto">
-                        <button type="submit" class="btn btn-primary fw-bold">Покажи</button>
-                    </div>
-                </form>
-                <div class="report-card mb-3">
-                    <div class="report-label">Оборот за {{ selected_month_label }}</div>
-                    <div class="report-value">{{ month_sales_total }} €</div>
-                    <div class="small text-muted">{{ month_sales_count }} продажби</div>
+{% if user.is_superuser or user.role == 'admin' %}
+    <div class="modal fade" id="monthlyReportModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="fas fa-calendar-alt me-2"></i> Месечен отчет</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="report-card mb-3">
-                    <div class="report-label">Посещаемост за {{ selected_month_label }}</div>
-                    <div class="report-value">{{ month_attendance }}</div>
-                    <div class="small text-muted">Игри и тренировки за избрания месец</div>
+                <div class="modal-body bg-light">
+                    <form method="get" action="{% url 'reception' %}" class="row g-2 align-items-end mb-3">
+                        <input type="hidden" name="open_report" value="monthly">
+                        <input type="hidden" name="report_date" value="{{ selected_day_value }}">
+                        <input type="hidden" name="report_year" value="{{ selected_year }}">
+                        <div class="col">
+                            <label class="form-label fw-bold">Избери месец</label>
+                            <input type="month" name="report_month" class="form-control" value="{{ selected_month_value }}">
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-primary fw-bold">Покажи</button>
+                        </div>
+                    </form>
+                    <div class="report-card mb-3">
+                        <div class="report-label">Оборот за {{ selected_month_label }}</div>
+                        <div class="report-value">{{ month_sales_total }} €</div>
+                        <div class="small text-muted">{{ month_sales_count }} продажби</div>
+                    </div>
+                    <div class="report-card mb-3">
+                        <div class="report-label">Посещаемост за {{ selected_month_label }}</div>
+                        <div class="report-value">{{ month_attendance }}</div>
+                        <div class="small text-muted">Игри и тренировки за избрания месец</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="modal fade" id="yearlyReportModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title"><i class="fas fa-calendar-check me-2"></i> Годишен отчет</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body bg-light">
-                <form method="get" action="{% url 'reception' %}" class="row g-2 align-items-end mb-3">
-                    <input type="hidden" name="open_report" value="yearly">
-                    <input type="hidden" name="report_date" value="{{ selected_day_value }}">
-                    <input type="hidden" name="report_month" value="{{ selected_month_value }}">
-                    <div class="col">
-                        <label class="form-label fw-bold">Избери година</label>
-                        <select name="report_year" class="form-select">
-                            {% for year in report_years %}
-                                <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-auto">
-                        <button type="submit" class="btn btn-primary fw-bold">Покажи</button>
-                    </div>
-                </form>
-                <div class="report-card mb-3">
-                    <div class="report-label">Оборот за {{ selected_year }} г.</div>
-                    <div class="report-value">{{ year_sales_total }} €</div>
-                    <div class="small text-muted">{{ year_sales_count }} продажби</div>
+    <div class="modal fade" id="yearlyReportModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title"><i class="fas fa-calendar-check me-2"></i> Годишен отчет</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="report-card mb-3">
-                    <div class="report-label">Посещаемост за {{ selected_year }} г.</div>
-                    <div class="report-value">{{ year_attendance }}</div>
-                    <div class="small text-muted">Игри и тренировки за избраната година</div>
+                <div class="modal-body bg-light">
+                    <form method="get" action="{% url 'reception' %}" class="row g-2 align-items-end mb-3">
+                        <input type="hidden" name="open_report" value="yearly">
+                        <input type="hidden" name="report_date" value="{{ selected_day_value }}">
+                        <input type="hidden" name="report_month" value="{{ selected_month_value }}">
+                        <div class="col">
+                            <label class="form-label fw-bold">Избери година</label>
+                            <select name="report_year" class="form-select">
+                                {% for year in report_years %}
+                                    <option value="{{ year }}" {% if year == selected_year %}selected{% endif %}>{{ year }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-primary fw-bold">Покажи</button>
+                        </div>
+                    </form>
+                    <div class="report-card mb-3">
+                        <div class="report-label">Оборот за {{ selected_year }} г.</div>
+                        <div class="report-value">{{ year_sales_total }} €</div>
+                        <div class="small text-muted">{{ year_sales_count }} продажби</div>
+                    </div>
+                    <div class="report-card mb-3">
+                        <div class="report-label">Посещаемост за {{ selected_year }} г.</div>
+                        <div class="report-value">{{ year_attendance }}</div>
+                        <div class="small text-muted">Игри и тренировки за избраната година</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+{% endif %}
 
 <div class="modal fade" id="cashModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -1899,7 +1948,7 @@
         window.history.replaceState({}, '', dailyUrl);
     }
 
-    if (params.get('open_report') === 'monthly') {
+    if (params.get('open_report') === 'monthly' && document.getElementById('monthlyReportModal')) {
         bootstrap.Modal.getOrCreateInstance(document.getElementById('monthlyReportModal')).show();
         params.delete('open_report');
         var monthlyUrl = new URL(window.location.href);
@@ -1907,7 +1956,7 @@
         window.history.replaceState({}, '', monthlyUrl);
     }
 
-    if (params.get('open_report') === 'yearly') {
+    if (params.get('open_report') === 'yearly' && document.getElementById('yearlyReportModal')) {
         bootstrap.Modal.getOrCreateInstance(document.getElementById('yearlyReportModal')).show();
         params.delete('open_report');
         var yearlyUrl = new URL(window.location.href);

@@ -190,28 +190,57 @@
                                 <td class="fw-bold">{{ booking.start_time|date:"H:i" }}</td>
                                 <td>{{ booking.court.name }}</td>
                                 {% if is_trainer_profile %}
-                                    <td>{{ booking.customer.get_full_name|default:booking.customer.username }}</td>
-                                    <td>{{ booking.get_training_type_display|default:"Тренировка" }}</td>
+                                    <td class="text-start">
+                                        <div class="fw-semibold">{{ booking.customer.get_full_name|default:booking.customer.username }}</div>
+                                        {% if not booking.is_active and booking.cancellation_reason %}
+                                            <div class="small text-danger mt-1">Причина: {{ booking.cancellation_reason }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-start">
+                                        <div>{{ booking.get_training_type_display|default:"Тренировка" }}</div>
+                                        {% if not booking.is_active and booking.cancelled_at %}
+                                            <div class="small text-muted">Отменена на {{ booking.cancelled_at|date:"d.m.Y H:i" }}</div>
+                                        {% endif %}
+                                    </td>
                                 {% else %}
                                     <td class="text-start">
                                         {% if booking.trainer %}
                                             <div class="fw-semibold">{{ booking.get_training_type_display }}</div>
                                             <div class="small text-muted">С треньор {{ booking.trainer.get_full_name|default:booking.trainer.username }}</div>
+                                            {% if not booking.is_active and booking.cancellation_reason %}
+                                                <div class="small text-danger mt-1">Отменена от треньора: {{ booking.cancellation_reason }}</div>
+                                            {% endif %}
                                         {% else %}
                                             <span class="text-muted">Стандартна резервация</span>
+                                            {% if not booking.is_active and booking.cancellation_reason %}
+                                                <div class="small text-danger mt-1">
+                                                    Отменена от {{ booking.cancelled_by.get_full_name|default:booking.cancelled_by.username|default:"служител" }}: {{ booking.cancellation_reason }}
+                                                </div>
+                                            {% endif %}
                                         {% endif %}
                                     </td>
                                 {% endif %}
                                 <td>
-                                    {% if booking.start_time < now %}
+                                    {% if not booking.is_active and booking.cancellation_reason %}
+                                        <span class="badge bg-danger">Отменена</span>
+                                    {% elif booking.start_time < now %}
                                         <span class="badge bg-secondary">Минала</span>
                                     {% else %}
                                         <span class="badge bg-success status-pill">Активна</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if not is_trainer_profile and booking.start_time > now %}
-                                        <a href="{% url 'cancel_booking' booking.id %}" 
+                                    {% if is_trainer_profile and booking.is_active and booking.start_time > now %}
+                                        <button
+                                            type="button"
+                                            class="btn btn-outline-danger btn-sm fw-bold"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#trainerCancelModal{{ booking.id }}"
+                                        >
+                                            Отмени
+                                        </button>
+                                    {% elif not is_trainer_profile and booking.is_active and booking.start_time > now %}
+                                        <a href="{% url 'cancel_booking' booking.id %}"
                                            class="btn btn-outline-danger btn-sm fw-bold"
                                            onclick="return confirm('Сигурни ли сте, че искате да откажете часа?')">
                                             Откажи
@@ -221,6 +250,42 @@
                                     {% endif %}
                                 </td>
                             </tr>
+                            {% if is_trainer_profile %}
+                                <div class="modal fade" id="trainerCancelModal{{ booking.id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title">Отмяна на тренировка</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Затвори"></button>
+                                            </div>
+                                            <form method="post" action="{% url 'trainer_cancel_booking' booking.id %}">
+                                                <div class="modal-body">
+                                                    {% csrf_token %}
+                                                    <p class="mb-3">
+                                                        Клиент: <strong>{{ booking.customer.get_full_name|default:booking.customer.username }}</strong><br>
+                                                        Час: <strong>{{ booking.start_time|date:"d.m.Y H:i" }}</strong><br>
+                                                        Корт: <strong>{{ booking.court.name }}</strong>
+                                                    </p>
+                                                    <label for="cancelReason{{ booking.id }}" class="form-label fw-bold">Причина за отмяна</label>
+                                                    <textarea
+                                                        id="cancelReason{{ booking.id }}"
+                                                        name="cancellation_reason"
+                                                        class="form-control"
+                                                        rows="4"
+                                                        placeholder="Опишете накратко защо тренировката се отменя..."
+                                                        required
+                                                    ></textarea>
+                                                    <div class="form-text">Тази причина ще се вижда от клиента в неговия профил.</div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Затвори</button>
+                                                    <button type="submit" class="btn btn-danger">Потвърди отмяната</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
                             {% empty %}
                             <tr>
                                 <td colspan="{% if is_trainer_profile %}7{% else %}6{% endif %}" class="py-4 text-muted">

@@ -1,6 +1,7 @@
 import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.views import LoginView
 from .models import Product, TrainerProfile, Court, Booking, Sale, SaleItem, CashTransaction, ShiftClose, Expense, User
 from .forms import CustomerProfileEditForm, ExpenseForm, ProfilePhotoForm, UserRegisterForm
@@ -61,6 +62,18 @@ TRAINER_BOOKING_RULES = {
 def get_slot_start(selected_date, hour):
     slot_start = datetime.combine(selected_date, time(hour, 0))
     return timezone.make_aware(slot_start, timezone.get_current_timezone())
+
+
+def get_booking_day_bounds(selected_date):
+    day_start = timezone.make_aware(
+        datetime.combine(selected_date, time.min),
+        BOOKING_TIME_ZONE,
+    )
+    return day_start, day_start + timedelta(days=1)
+
+
+def get_booking_local_start(booking):
+    return timezone.localtime(booking.start_time, BOOKING_TIME_ZONE)
 
 
 def is_slot_bookable(selected_date, hour):
@@ -172,8 +185,11 @@ class RoleAwareLoginView(LoginView):
         next_url = self.get_redirect_url()
         if next_url:
             return next_url
-        if getattr(self.request.user, 'role', '') == 'accounting':
+        user_role = getattr(self.request.user, 'role', '')
+        if user_role == 'accounting':
             return reverse('finance')
+        if user_role == 'employee':
+            return reverse('reception')
         return reverse('home')
 
 
@@ -778,8 +794,11 @@ def redirect_back_to_finance(request):
 
 # --- 1. НАЧАЛНА СТРАНИЦА ---
 def home(request):
-    if request.user.is_authenticated and request.user.role == 'accounting':
-        return redirect('finance')
+    if request.user.is_authenticated:
+        if request.user.role == 'accounting':
+            return redirect('finance')
+        if request.user.role == 'employee':
+            return redirect('reception')
 
     public_price_names = ['Игра за 1 час', 'Наем на ракета', 'Наем на перо']
     products = Product.objects.filter(name__in=public_price_names)
@@ -812,7 +831,12 @@ def schedule(request):
     end_hour = 22
     hours_range = range(start_hour, end_hour)
 
-    bookings = Booking.objects.filter(start_time__date=selected_date, is_active=True).select_related('customer', 'trainer', 'court')
+    day_start, day_end = get_booking_day_bounds(selected_date)
+    bookings = Booking.objects.filter(
+        start_time__gte=day_start,
+        start_time__lt=day_end,
+        is_active=True,
+    ).select_related('customer', 'trainer', 'court')
     trainer_options_by_hour = build_trainer_options_by_hour(selected_date)
 
     schedule_data = []
@@ -823,7 +847,8 @@ def schedule(request):
             is_taken = False
             booking_info = None
             for b in bookings:
-                if b.court == court and b.start_time.hour == hour:
+                booking_local_start = get_booking_local_start(b)
+                if b.court == court and booking_local_start.hour == hour and booking_local_start.date() == selected_date:
                     is_taken = True
                     booking_info = b
                     break
@@ -943,9 +968,11 @@ def make_booking(request):
         exists = Booking.objects.filter(court=court, start_time=start_time, is_active=True).exists()
 
         if customer.role == 'customer':
+            customer_day_start, customer_day_end = get_booking_day_bounds(date_obj)
             customer_daily_bookings = Booking.objects.filter(
                 customer=customer,
-                start_time__date=date_obj,
+                start_time__gte=customer_day_start,
+                start_time__lt=customer_day_end,
                 is_active=True,
             ).count()
             if customer_daily_bookings >= MAX_DAILY_BOOKINGS_PER_CUSTOMER:
@@ -993,6 +1020,14 @@ def booking_login_required(request):
 def profile(request):
     if request.user.role == 'accounting':
         return redirect('finance')
+
+    if request.user.role == 'customer':
+        Booking.objects.filter(
+            customer=request.user,
+            is_active=False,
+            cancellation_reason__gt='',
+            cancellation_seen_by_customer=False,
+        ).update(cancellation_seen_by_customer=True)
 
     customer_edit_form = None
     photo_form = None
@@ -1143,6 +1178,83 @@ def cancel_booking(request, booking_id):
         
     return redirect(request.META.get('HTTP_REFERER', 'profile'))
 
+
+@login_required
+def trainer_cancel_booking(request, booking_id):
+    if request.method != 'POST':
+        return redirect('profile')
+
+    booking = get_object_or_404(
+        Booking.objects.select_related('trainer', 'customer', 'court'),
+        id=booking_id,
+    )
+
+    if request.user.role != 'trainer' or booking.trainer != request.user:
+        messages.error(request, 'Нямате право да отменяте тази тренировка.')
+        return redirect('profile')
+
+    if not booking.is_active:
+        messages.warning(request, 'Тази тренировка вече е отменена.')
+        return redirect('profile')
+
+    if booking.start_time <= timezone.now():
+        messages.error(request, 'Не може да отменяте тренировки, които вече са започнали или са минали.')
+        return redirect('profile')
+
+    cancellation_reason = (request.POST.get('cancellation_reason') or '').strip()
+    if not cancellation_reason:
+        messages.error(request, 'Моля, добавете причина за отмяна, за да бъде информиран клиентът.')
+        return redirect('profile')
+
+    booking.is_active = False
+    booking.cancellation_reason = cancellation_reason
+    booking.cancelled_at = timezone.now()
+    booking.cancellation_seen_by_customer = False
+    booking.cancelled_by = request.user
+    booking.save(update_fields=['is_active', 'cancellation_reason', 'cancelled_at', 'cancellation_seen_by_customer', 'cancelled_by'])
+
+    customer_name = booking.customer.get_full_name() or booking.customer.username
+    messages.success(request, f'Тренировката на {customer_name} беше отменена успешно.')
+    return redirect('profile')
+
+
+@login_required
+def staff_cancel_booking(request, booking_id):
+    if request.method != 'POST':
+        return redirect('reception')
+
+    if not (request.user.is_superuser or request.user.role in ['admin', 'employee']):
+        return redirect('home')
+
+    booking = get_object_or_404(
+        Booking.objects.select_related('trainer', 'customer', 'court'),
+        id=booking_id,
+    )
+
+    if not booking.is_active:
+        messages.warning(request, 'Тази резервация вече е отменена.')
+        return redirect_back_to_reception(request)
+
+    if booking.start_time <= timezone.now():
+        messages.error(request, 'Не може да отменяте резервации, които вече са започнали или са минали.')
+        return redirect_back_to_reception(request)
+
+    cancellation_reason = (request.POST.get('cancellation_reason') or '').strip()
+    if not cancellation_reason:
+        messages.error(request, 'Моля, добавете причина за отмяна, за да бъде информиран клиентът.')
+        return redirect_back_to_reception(request)
+
+    booking.is_active = False
+    booking.cancellation_reason = cancellation_reason
+    booking.cancelled_at = timezone.now()
+    booking.cancellation_seen_by_customer = False
+    booking.cancelled_by = request.user
+    booking.save(update_fields=['is_active', 'cancellation_reason', 'cancelled_at', 'cancellation_seen_by_customer', 'cancelled_by'])
+
+    customer_name = booking.customer.get_full_name() or booking.customer.username
+    messages.success(request, f'Резервацията на {customer_name} беше отменена успешно.')
+    return redirect_back_to_reception(request)
+
 # --- 7. РЕЦЕПЦИЯ (Главен панел за служители) ---
 @login_required
 def reception(request):
@@ -1162,9 +1274,11 @@ def reception(request):
     courts = Court.objects.filter(is_active=True)
     hours_range = range(8, 22)
     
+    day_start, day_end = get_booking_day_bounds(selected_date)
     daily_bookings = Booking.objects.filter(
-        start_time__date=selected_date, 
-        is_active=True
+        start_time__gte=day_start,
+        start_time__lt=day_end,
+        is_active=True,
     ).select_related('customer', 'trainer', 'court').order_by('start_time')
     trainer_options_by_hour = build_trainer_options_by_hour(selected_date)
 
@@ -1175,7 +1289,8 @@ def reception(request):
         for court in courts:
             booking_info = None
             for booking in daily_bookings:
-                if booking.court == court and booking.start_time.hour == hour:
+                booking_local_start = get_booking_local_start(booking)
+                if booking.court == court and booking_local_start.hour == hour and booking_local_start.date() == selected_date:
                     booking_info = booking
                     break
             slots.append({
@@ -1507,14 +1622,15 @@ def reception_exit(request):
         return redirect('home')
 
     if get_reception_bill(request):
-        messages.error(request, 'Има активна сметка. Приключете или изчистете сметката преди изход.')
+        messages.error(request, '??? ??????? ??????. ?????????? ??? ????????? ???????? ????? ?????.')
         return redirect('reception')
 
     today_start, _, _ = get_report_periods()
     if has_reception_activity_since_last_close(today_start):
-        messages.error(request, 'Първо трябва да приключите деня, преди да излезете от рецепцията.')
+        messages.error(request, '????? ?????? ?? ?????????? ????, ????? ?? ???????? ?? ??????????.')
         return redirect('reception')
 
+    auth_logout(request)
     return redirect('home')
 
 # --- 9. МАРКИРАНЕ НА ПЛАЩАНЕ (ТОВА ЛИПСВАШЕ!) ---

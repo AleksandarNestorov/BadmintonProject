@@ -56,6 +56,8 @@ urlpatterns = [
     path('booking/login-required/', views.booking_login_required, name='booking_login_required'),
     path('booking/make/', views.make_booking, name='make_booking'),
     path('booking/cancel/<int:booking_id>/', views.cancel_booking, name='cancel_booking'),
+    path('booking/trainer-cancel/<int:booking_id>/', views.trainer_cancel_booking, name='trainer_cancel_booking'),
+    path('booking/staff-cancel/<int:booking_id>/', views.staff_cancel_booking, name='staff_cancel_booking'),
     path('booking/pay/<int:booking_id>/', views.mark_paid, name='mark_paid'),
 
     # --- РЕЦЕПЦИЯ (Това липсваше!) ---

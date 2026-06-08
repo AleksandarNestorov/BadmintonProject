@@ -4,6 +4,9 @@ __pycache__/
 *$py.class
 venv/
 .venv/
+.env
+.env.*
 db.sqlite3
 media/
+sent_emails/
 mysql_data.json

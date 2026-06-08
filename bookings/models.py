@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.utils import timezone
 
 # 1. Потребител
 class User(AbstractUser):
@@ -99,6 +100,17 @@ class Booking(models.Model):
     end_time = models.DateTimeField()
     is_active = models.BooleanField(default=True)
     training_type = models.CharField(max_length=20, choices=TRAINING_TYPE_CHOICES, blank=True, default='')
+    cancellation_reason = models.TextField(blank=True, default='', verbose_name="Причина за отмяна")
+    cancelled_at = models.DateTimeField(blank=True, null=True, verbose_name="Отменена на")
+    cancellation_seen_by_customer = models.BooleanField(default=True, verbose_name="Видяна от клиента")
+    cancelled_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='cancelled_booking_actions',
+        verbose_name="Отменена от",
+    )
     
     PAYMENT_STATUS_CHOICES = (
         ('not_paid', 'Неплатено'),
@@ -108,7 +120,8 @@ class Booking(models.Model):
     payment_status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='not_paid')
 
     def __str__(self):
-        return f"{self.court.name} - {self.start_time.strftime('%d.%m %H:%M')}"
+        local_start = timezone.localtime(self.start_time)
+        return f"{self.court.name} - {local_start.strftime('%d.%m %H:%M')}"
 
 # 6. Продажби (История на покупките от рецепцията) - ТОВА ЛИПСВАШЕ
 class Sale(models.Model):

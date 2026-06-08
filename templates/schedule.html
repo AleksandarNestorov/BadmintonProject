@@ -90,8 +90,11 @@
         </a>
 
         {% if user.is_authenticated %}
-            <a href="{% url 'profile' %}" class="nav-link">
+            <a href="{% url 'profile' %}" class="nav-link d-inline-flex align-items-center gap-2">
                 {{ user.get_full_name|default:user.username }}
+                {% if profile_alert_count %}
+                    <span class="badge rounded-pill bg-danger">{{ profile_alert_count }}</span>
+                {% endif %}
             </a>
         {% else %}
             <div>
