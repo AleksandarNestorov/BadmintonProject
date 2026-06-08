@@ -1,9 +1,9 @@
 import re
 
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
-from .models import Expense, User
+from .models import CATEGORY_CHOICES, Expense, Product, User
 
 
 PHONE_COUNTRY_RULES = {
@@ -43,6 +43,24 @@ PHONE_COUNTRY_CHOICES = [
     (country_code, settings['label'])
     for country_code, settings in PHONE_COUNTRY_RULES.items()
 ]
+
+
+class UserLoginForm(AuthenticationForm):
+    error_messages = {
+        'invalid_login': 'Невалидно потребителско име или парола.',
+        'inactive': 'Този профил е деактивиран. Свържете се с администратор, ако смятате, че това е грешка.',
+    }
+
+    def clean(self):
+        username = (self.data.get('username') or '').strip()
+        if username:
+            matched_user = User.objects.filter(username__iexact=username).only('id', 'is_active').first()
+            if matched_user and not matched_user.is_active:
+                raise forms.ValidationError(
+                    self.error_messages['inactive'],
+                    code='inactive',
+                )
+        return super().clean()
 
 
 class UserRegisterForm(UserCreationForm):
@@ -269,6 +287,57 @@ class ProfilePhotoForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['profile_photo'].required = False
         self.fields['profile_photo'].widget.attrs.update({'class': 'form-control'})
+
+
+class AdminUserManagementForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email', 'phone', 'role', 'is_active']
+        labels = {
+            'first_name': 'Име',
+            'last_name': 'Фамилия',
+            'email': 'Имейл',
+            'phone': 'Телефон',
+            'role': 'Роля',
+            'is_active': 'Активен',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name, field in self.fields.items():
+            if field_name == 'is_active':
+                field.widget.attrs.update({'class': 'form-check-input'})
+            elif field_name == 'role':
+                field.widget.attrs.update({'class': 'form-select form-select-sm'})
+            else:
+                field.widget.attrs.update({'class': 'form-control form-control-sm'})
+
+
+class AdminCatalogItemForm(forms.ModelForm):
+    class Meta:
+        model = Product
+        fields = ['name', 'description', 'category', 'price', 'quantity']
+        labels = {
+            'name': 'Име',
+            'description': 'Описание',
+            'category': 'Категория',
+            'price': 'Цена',
+            'quantity': 'Наличност',
+        }
+
+    def __init__(self, *args, allowed_categories=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['category'].choices = [
+            choice for choice in CATEGORY_CHOICES
+            if allowed_categories is None or choice[0] in allowed_categories
+        ]
+        self.fields['quantity'].required = False
+
+        self.fields['name'].widget.attrs.update({'class': 'form-control form-control-sm'})
+        self.fields['description'].widget.attrs.update({'class': 'form-control form-control-sm'})
+        self.fields['category'].widget.attrs.update({'class': 'form-select form-select-sm'})
+        self.fields['price'].widget.attrs.update({'class': 'form-control form-control-sm', 'step': '0.01', 'min': '0'})
+        self.fields['quantity'].widget.attrs.update({'class': 'form-control form-control-sm', 'min': '0', 'placeholder': 'по избор'})
 
 
 class ExpenseForm(forms.ModelForm):

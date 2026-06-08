@@ -820,7 +820,7 @@
             </form>
         </div>
         <div class="card-body">
-            <p class="archive-meta mb-3">Показват се {{ selected_archive_label }}.</p>
+            <p class="archive-meta mb-3">{{ selected_archive_label|capfirst }}.</p>
             <div class="accordion" id="financeArchiveAccordion">
                 {% for shift_close in shift_close_archive %}
                     <div class="accordion-item">

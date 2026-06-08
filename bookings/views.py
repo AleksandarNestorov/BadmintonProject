@@ -4,7 +4,15 @@ from django.contrib import messages
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth.views import LoginView
 from .models import Product, TrainerProfile, Court, Booking, Sale, SaleItem, CashTransaction, ShiftClose, Expense, User
-from .forms import CustomerProfileEditForm, ExpenseForm, ProfilePhotoForm, UserRegisterForm
+from .forms import (
+    AdminCatalogItemForm,
+    AdminUserManagementForm,
+    CustomerProfileEditForm,
+    ExpenseForm,
+    ProfilePhotoForm,
+    UserLoginForm,
+    UserRegisterForm,
+)
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from datetime import datetime, timedelta, time
@@ -171,7 +179,11 @@ def user_can_access_reception(user):
 
 
 def user_can_access_finance(user):
-    return user.is_superuser or user.role in ['admin', 'accounting']
+    return user.role == 'accounting'
+
+
+def user_can_access_management(user):
+    return user.is_superuser or user.role == 'admin'
 
 
 def user_can_create_own_bookings(user):
@@ -180,6 +192,7 @@ def user_can_create_own_bookings(user):
 
 class RoleAwareLoginView(LoginView):
     template_name = 'login.html'
+    authentication_form = UserLoginForm
 
     def get_success_url(self):
         next_url = self.get_redirect_url()
@@ -190,6 +203,8 @@ class RoleAwareLoginView(LoginView):
             return reverse('finance')
         if user_role == 'employee':
             return reverse('reception')
+        if user_role == 'admin':
+            return reverse('management')
         return reverse('home')
 
 
@@ -683,14 +698,14 @@ def build_reception_reports_context(request):
             selected_archive_value = ''
 
     shift_close_archive = shift_close_archive_queryset[:30]
-    low_stock_products = Product.objects.filter(quantity__isnull=False, quantity__lte=5).exclude(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('quantity', 'name')
+    low_stock_products = Product.objects.filter(is_active=True, quantity__isnull=False, quantity__lte=5).exclude(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('quantity', 'name')
 
     filtered_products_queryset = apply_finance_type_filter(
-        Product.objects.exclude(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('category', 'name'),
+        Product.objects.filter(is_active=True).exclude(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('category', 'name'),
         selected_finance_filter,
     )
     filtered_services_queryset = apply_finance_type_filter(
-        Product.objects.filter(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('category', 'name'),
+        Product.objects.filter(is_active=True, category__in=RECEPTION_SERVICE_CATEGORIES).order_by('category', 'name'),
         selected_finance_filter,
     )
     filtered_sales_history = (
@@ -792,22 +807,33 @@ def redirect_back_to_finance(request):
     return redirect('finance')
 
 
-# --- 1. НАЧАЛНА СТРАНИЦА ---
+def redirect_back_to_management(request):
+    params = {}
+    for key in ['q', 'user_role']:
+        value = request.POST.get(key) or request.GET.get(key)
+        if value:
+            params[key] = value
+    if params:
+        return redirect(f"{reverse('management')}?{urlencode(params)}")
+    return redirect('management')
+
+
 def home(request):
     if request.user.is_authenticated:
         if request.user.role == 'accounting':
             return redirect('finance')
         if request.user.role == 'employee':
             return redirect('reception')
+        if request.user.role == 'admin':
+            return redirect('management')
 
     public_price_names = ['Игра за 1 час', 'Наем на ракета', 'Наем на перо']
-    products = Product.objects.filter(name__in=public_price_names)
+    products = Product.objects.filter(name__in=public_price_names, is_active=True)
     products = sorted(products, key=lambda product: public_price_names.index(product.name))
     trainers = TrainerProfile.objects.all()
     context = {'products': products, 'trainers': trainers}
     return render(request, 'home.html', context)
 
-# --- 2. РЕГИСТРАЦИЯ ---
 def register(request):
     if request.method == 'POST':
         form = UserRegisterForm(request.POST)
@@ -820,8 +846,10 @@ def register(request):
         form = UserRegisterForm()
     return render(request, 'register.html', {'form': form})
 
-# --- 3. ГРАФИК (За Клиенти) ---
 def schedule(request):
+    if request.user.is_authenticated and request.user.role == 'accounting':
+        return redirect('finance')
+
     selected_date, min_booking_date, max_booking_date, date_was_clamped = parse_schedule_date(request.GET.get('date'), request.user)
     if date_was_clamped:
         messages.warning(request, 'Можете да запазвате часове само в позволения период за този профил.')
@@ -886,7 +914,6 @@ def schedule(request):
     }
     return render(request, 'schedule.html', context)
 
-# --- 4. ЗАПАЗВАНЕ НА ЧАС ---
 def make_booking(request):
     if not request.user.is_authenticated:
         messages.warning(
@@ -1002,7 +1029,6 @@ def make_booking(request):
                 )
             messages.success(request, success_message)
             
-        # Връщаме се там, откъдето сме дошли (или в графика, или в рецепцията)
         return redirect(request.META.get('HTTP_REFERER', 'schedule'))
     return redirect('schedule')
 
@@ -1015,7 +1041,6 @@ def booking_login_required(request):
     next_url = request.GET.get('next') or reverse('schedule')
     return redirect(f"{reverse('login')}?next={quote(next_url, safe='/')}")
 
-# --- 5. ПРОФИЛ ---
 @login_required
 def profile(request):
     if request.user.role == 'accounting':
@@ -1093,6 +1118,187 @@ def profile(request):
 
 
 @login_required
+def management(request):
+    if not user_can_access_management(request.user):
+        return redirect('home')
+
+    search_query = (request.GET.get('q') or '').strip()
+    user_role_filter = (request.GET.get('user_role') or '').strip()
+
+    users = User.objects.order_by('role', 'username')
+    if user_role_filter:
+        users = users.filter(role=user_role_filter)
+    if search_query:
+        users = users.filter(
+            Q(username__icontains=search_query)
+            | Q(first_name__icontains=search_query)
+            | Q(last_name__icontains=search_query)
+            | Q(email__icontains=search_query)
+            | Q(phone__icontains=search_query)
+        )
+
+    products = Product.objects.filter(category__in=['drink', 'product']).order_by('is_active', 'category', 'name')
+    services = Product.objects.filter(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('is_active', 'category', 'name')
+    if search_query:
+        product_search = Q(name__icontains=search_query) | Q(description__icontains=search_query)
+        products = products.filter(product_search)
+        services = services.filter(product_search)
+
+    edited_user_id = None
+    edited_product_id = None
+    edited_service_id = None
+    bound_user_form = None
+    bound_product_form = None
+    bound_service_form = None
+    new_product_form = AdminCatalogItemForm(prefix='new_product', allowed_categories=['drink', 'product'])
+    new_service_form = AdminCatalogItemForm(prefix='new_service', allowed_categories=RECEPTION_SERVICE_CATEGORIES)
+
+    def add_form_errors(form):
+        for field_errors in form.errors.values():
+            for error_text in field_errors:
+                messages.error(request, error_text)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'update_user':
+            edited_user_id = int(request.POST.get('user_id') or 0)
+            target_user = get_object_or_404(User, id=edited_user_id)
+            bound_user_form = AdminUserManagementForm(request.POST, instance=target_user, prefix=f'user_{target_user.id}')
+            if bound_user_form.is_valid():
+                updated_user = bound_user_form.save(commit=False)
+                if target_user == request.user and (not updated_user.is_active or updated_user.role != 'admin'):
+                    messages.error(request, 'Не можете да деактивирате собствения си администраторски профил или да му смените ролята.')
+                else:
+                    updated_user.save()
+                    messages.success(request, f'Потребителят {updated_user.username} беше обновен успешно.')
+                    return redirect_back_to_management(request)
+            else:
+                add_form_errors(bound_user_form)
+
+        elif action == 'update_product':
+            edited_product_id = int(request.POST.get('product_id') or 0)
+            target_product = get_object_or_404(Product, id=edited_product_id, category__in=['drink', 'product'])
+            bound_product_form = AdminCatalogItemForm(
+                request.POST,
+                instance=target_product,
+                prefix=f'product_{target_product.id}',
+                allowed_categories=['drink', 'product'],
+            )
+            if bound_product_form.is_valid():
+                bound_product_form.save()
+                messages.success(request, f'Продуктът {target_product.name} беше обновен успешно.')
+                return redirect_back_to_management(request)
+            add_form_errors(bound_product_form)
+
+        elif action == 'update_service':
+            edited_service_id = int(request.POST.get('service_id') or 0)
+            target_service = get_object_or_404(Product, id=edited_service_id, category__in=RECEPTION_SERVICE_CATEGORIES)
+            bound_service_form = AdminCatalogItemForm(
+                request.POST,
+                instance=target_service,
+                prefix=f'service_{target_service.id}',
+                allowed_categories=RECEPTION_SERVICE_CATEGORIES,
+            )
+            if bound_service_form.is_valid():
+                bound_service_form.save()
+                messages.success(request, f'Услугата {target_service.name} беше обновена успешно.')
+                return redirect_back_to_management(request)
+            add_form_errors(bound_service_form)
+
+        elif action == 'add_product':
+            new_product_form = AdminCatalogItemForm(
+                request.POST,
+                prefix='new_product',
+                allowed_categories=['drink', 'product'],
+            )
+            if new_product_form.is_valid():
+                created_product = new_product_form.save()
+                messages.success(request, f'Продуктът {created_product.name} беше добавен успешно.')
+                return redirect_back_to_management(request)
+            add_form_errors(new_product_form)
+
+        elif action == 'add_service':
+            new_service_form = AdminCatalogItemForm(
+                request.POST,
+                prefix='new_service',
+                allowed_categories=RECEPTION_SERVICE_CATEGORIES,
+            )
+            if new_service_form.is_valid():
+                created_service = new_service_form.save()
+                messages.success(request, f'Услугата {created_service.name} беше добавена успешно.')
+                return redirect_back_to_management(request)
+            add_form_errors(new_service_form)
+
+        elif action == 'toggle_product_active':
+            target_product = get_object_or_404(Product, id=int(request.POST.get('product_id') or 0), category__in=['drink', 'product'])
+            target_product.is_active = not target_product.is_active
+            target_product.save(update_fields=['is_active'])
+            messages.success(
+                request,
+                f"Продуктът {target_product.name} беше {'възстановен' if target_product.is_active else 'архивиран'} успешно.",
+            )
+            return redirect_back_to_management(request)
+
+        elif action == 'toggle_service_active':
+            target_service = get_object_or_404(Product, id=int(request.POST.get('service_id') or 0), category__in=RECEPTION_SERVICE_CATEGORIES)
+            target_service.is_active = not target_service.is_active
+            target_service.save(update_fields=['is_active'])
+            messages.success(
+                request,
+                f"Услугата {target_service.name} беше {'възстановена' if target_service.is_active else 'архивирана'} успешно.",
+            )
+            return redirect_back_to_management(request)
+
+    managed_users = [
+        {
+            'user': managed_user,
+            'form': bound_user_form if edited_user_id == managed_user.id and bound_user_form else AdminUserManagementForm(
+                instance=managed_user,
+                prefix=f'user_{managed_user.id}',
+            ),
+        }
+        for managed_user in users
+    ]
+    managed_products = [
+        {
+            'product': product,
+            'form': bound_product_form if edited_product_id == product.id and bound_product_form else AdminCatalogItemForm(
+                instance=product,
+                prefix=f'product_{product.id}',
+                allowed_categories=['drink', 'product'],
+            ),
+        }
+        for product in products
+    ]
+    managed_services = [
+        {
+            'service': service,
+            'form': bound_service_form if edited_service_id == service.id and bound_service_form else AdminCatalogItemForm(
+                instance=service,
+                prefix=f'service_{service.id}',
+                allowed_categories=RECEPTION_SERVICE_CATEGORIES,
+            ),
+        }
+        for service in services
+    ]
+
+    context = {
+        'managed_users': managed_users,
+        'managed_products': managed_products,
+        'managed_services': managed_services,
+        'new_product_form': new_product_form,
+        'new_service_form': new_service_form,
+        'active_users_count': users.filter(is_active=True).count(),
+        'low_stock_products_count': Product.objects.filter(is_active=True, category__in=['drink', 'product'], quantity__isnull=False, quantity__lte=5).count(),
+        'search_query': search_query,
+        'user_role_filter': user_role_filter,
+        'role_filter_choices': User.ROLE_CHOICES,
+    }
+    return render(request, 'management.html', context)
+
+
+@login_required
 def finance(request):
     if not user_can_access_finance(request.user):
         return redirect('home')
@@ -1102,8 +1308,8 @@ def finance(request):
 
     context = {
         **reports_context,
-        'products': Product.objects.exclude(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('category', 'name'),
-        'services': Product.objects.filter(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('category', 'name'),
+        'products': Product.objects.filter(is_active=True).exclude(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('category', 'name'),
+        'services': Product.objects.filter(is_active=True, category__in=RECEPTION_SERVICE_CATEGORIES).order_by('category', 'name'),
         'sales_history': (
             Sale.objects
             .select_related('cashier')
@@ -1161,12 +1367,10 @@ def add_expense(request):
     messages.success(request, 'Разходът е добавен успешно.')
     return redirect_back_to_finance(request)
 
-# --- 6. ОТКАЗ НА РЕЗЕРВАЦИЯ ---
 @login_required
 def cancel_booking(request, booking_id):
     booking = get_object_or_404(Booking, id=booking_id)
     
-    # Проверка: Клиентът трие свой час ИЛИ служител трие чужд час
     if booking.customer == request.user or request.user.role in ['admin', 'employee'] or request.user.is_superuser:
         if booking.start_time > timezone.now():
             booking.delete()
@@ -1255,7 +1459,6 @@ def staff_cancel_booking(request, booking_id):
     messages.success(request, f'Резервацията на {customer_name} беше отменена успешно.')
     return redirect_back_to_reception(request)
 
-# --- 7. РЕЦЕПЦИЯ (Главен панел за служители) ---
 @login_required
 def reception(request):
     if not user_can_access_reception(request.user):
@@ -1265,7 +1468,7 @@ def reception(request):
     if date_was_clamped:
         messages.warning(request, 'Можете да запазвате часове само в позволения период за този профил.')
 
-    all_products = Product.objects.all()
+    all_products = Product.objects.filter(is_active=True)
     products = all_products.filter(category__in=['drink', 'product']).order_by('category', 'name')
     service_products = all_products.filter(category__in=RECEPTION_SERVICE_CATEGORIES).order_by('category', 'name')
     bill = get_reception_bill(request)
@@ -1346,14 +1549,13 @@ def reception(request):
     }
     return render(request, 'reception.html', context)
 
-# --- 8. СМЕТКА НА РЕЦЕПЦИЯТА ---
 @login_required
 def add_to_bill(request, product_id):
     if not user_can_access_reception(request.user):
         return redirect('home')
 
     if request.method == 'POST':
-        product = get_object_or_404(Product, id=product_id)
+        product = get_object_or_404(Product, id=product_id, is_active=True)
         bill = get_reception_bill(request)
         product_key = str(product.id)
         current_quantity = int(bill.get(product_key, 0))
@@ -1622,18 +1824,17 @@ def reception_exit(request):
         return redirect('home')
 
     if get_reception_bill(request):
-        messages.error(request, '??? ??????? ??????. ?????????? ??? ????????? ???????? ????? ?????.')
+        messages.error(request, 'Има активна сметка. Приключете или изчистете текущата продажба преди изход.')
         return redirect('reception')
 
     today_start, _, _ = get_report_periods()
     if has_reception_activity_since_last_close(today_start):
-        messages.error(request, '????? ?????? ?? ?????????? ????, ????? ?? ???????? ?? ??????????.')
+        messages.error(request, 'Трябва първо да приключите деня, преди да излезете от рецепцията.')
         return redirect('reception')
 
     auth_logout(request)
     return redirect('home')
 
-# --- 9. МАРКИРАНЕ НА ПЛАЩАНЕ (ТОВА ЛИПСВАШЕ!) ---
 @login_required
 def mark_paid(request, booking_id):
     if not (request.user.is_superuser or request.user.role in ['admin', 'employee']):
@@ -1645,3 +1846,4 @@ def mark_paid(request, booking_id):
     
     messages.success(request, f'Резервацията на {booking.customer} беше маркирана като платена.')
     return redirect(request.META.get('HTTP_REFERER', 'reception'))
+

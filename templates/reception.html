@@ -10,21 +10,18 @@
     <link href="{% static 'css/site-ui.css' %}" rel="stylesheet">
     
     <style>
-        /* 1. ГЛОБАЛНИ НАСТРОЙКИ ЗА APP УСЕЩАНЕ */
         body {
             background:
                 linear-gradient(135deg, rgba(255, 193, 7, 0.08), rgba(255, 255, 255, 0.9)),
                 #eef2f6;
-            height: 100vh; /* Цял екран */
-            overflow: hidden; /* Без скрол на цялата страница */
+            height: 100vh;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-
-        /* 2. ГОРНА ЛЕНТА (HEADER) */
         .app-header {
-            background: #0f172a; /* Тъмно синьо-сиво */
+            background: #0f172a;
             color: white;
             padding: 0 20px;
             height: 60px;
@@ -36,8 +33,6 @@
         }
         .app-brand { font-size: 1.2rem; font-weight: bold; letter-spacing: 1px; }
         .cashier-info { background: #334155; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; }
-
-        /* 2.1 POS НАВИГАЦИЯ ПО СЕКЦИИ */
         .pos-tabs {
             height: 54px;
             background: #1e293b;
@@ -73,8 +68,6 @@
         .pos-tab i {
             font-size: 1rem;
         }
-
-        /* 3. ОСНОВЕН КОНТЕЙНЕР */
         .main-workspace {
             flex-grow: 1;
             padding: 15px;
@@ -114,8 +107,6 @@
             font-weight: 900;
             font-size: 1.2rem;
         }
-
-        /* 4. КАРТИ / ПАНЕЛИ */
         .panel {
             background: white;
             border-radius: 8px;
@@ -139,14 +130,12 @@
         }
         .panel-body {
             flex-grow: 1;
-            overflow-y: auto; /* Скрол само вътре в панела */
+            overflow-y: auto;
             padding: 10px;
         }
-
-        /* 5. БУТОНИ ТИП "ПЛОЧКИ" (Services) */
         .tile-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr); /* 2 колони */
+            grid-template-columns: repeat(2, 1fr);
             gap: 10px;
         }
         .quick-section {
@@ -187,8 +176,6 @@
         }
         .btn-tile i { font-size: 24px; margin-bottom: 8px; display: block; }
         .btn-tile small { display: block; font-weight: bold; margin-top: 5px; color: #10b981; }
-
-        /* 6. ТАБЛИЦИ */
         .table-custom thead th {
             background: #f1f5f9;
             color: #64748b;
@@ -490,8 +477,6 @@
                 display: none;
             }
         }
-        
-        /* 7. ТЪРСАЧКА */
         .search-container { position: relative; margin-bottom: 15px; }
         .search-container input {
             padding-left: 35px;
@@ -506,8 +491,6 @@
             transform: translateY(-50%);
             color: #94a3b8;
         }
-
-        /* Скролбар дизайн */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
@@ -1472,9 +1455,7 @@
                         <a href="{% url 'reception' %}?open_report=archive" class="btn btn-outline-secondary fw-bold">Последни</a>
                     </div>
                     <div class="col-12">
-                        <div class="small text-muted">
-                            Показват се {{ selected_archive_label }}{% if archive_is_filtered %}.{% else %}. Избери дата, за да видиш приключванията само за конкретен ден.{% endif %}
-                        </div>
+                        <div class="small text-muted">{{ selected_archive_label|capfirst }}.</div>
                     </div>
                 </form>
                 <div class="accordion" id="shiftArchiveAccordion">
@@ -2194,3 +2175,4 @@
 </script>
 </body>
 </html>
+

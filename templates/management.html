@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    {% load static %}
+    <link href="{% static 'css/site-ui.css' %}" rel="stylesheet">
+    <style>
+        .management-shell {
+            max-width: 1400px;
+        }
+        .management-hero {
+            padding: 2rem 0 1.25rem;
+        }
+        .management-grid {
+            display: grid;
+            gap: 1rem;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        }
+        .management-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.85rem;
+            align-items: end;
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            border: 1px solid rgba(16, 24, 40, 0.08);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+        }
+        .management-toolbar-group {
+            flex: 1 1 220px;
+        }
+        .management-stat {
+            border: 1px solid rgba(16, 24, 40, 0.08);
+            border-radius: 14px;
+            background: #fff;
+            padding: 1rem 1.1rem;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+        }
+        .management-stat-label {
+            color: #667085;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .management-stat-value {
+            color: #162544;
+            font-size: 1.85rem;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-top: 0.35rem;
+        }
+        .management-section + .management-section {
+            margin-top: 1.5rem;
+        }
+        .management-list {
+            display: grid;
+            gap: 1rem;
+        }
+        .management-item {
+            border: 1px solid rgba(16, 24, 40, 0.08);
+            border-radius: 16px;
+            background: #fff;
+            padding: 1rem;
+            box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+        }
+        .management-item-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 1rem;
+            margin-bottom: 0.9rem;
+        }
+        .management-item-title {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: #162544;
+            margin-bottom: 0.15rem;
+        }
+        .management-item-subtitle {
+            color: #667085;
+            font-size: 0.92rem;
+        }
+        .management-form-grid {
+            display: grid;
+            gap: 0.85rem;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        }
+        .management-actions {
+            margin-top: 0.9rem;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .management-head-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: flex-end;
+            align-items: center;
+        }
+        .management-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            border-radius: 999px;
+            padding: 0.35rem 0.7rem;
+            font-size: 0.82rem;
+            font-weight: 700;
+        }
+        .management-pill.role {
+            background: rgba(255, 191, 0, 0.16);
+            color: #8a5b00;
+        }
+        .management-pill.warn {
+            background: rgba(220, 53, 69, 0.12);
+            color: #b42318;
+        }
+        .management-pill.muted {
+            background: rgba(102, 112, 133, 0.12);
+            color: #475467;
+        }
+        .management-split {
+            display: grid;
+            gap: 1.5rem;
+            grid-template-columns: 1fr 1fr;
+        }
+        .management-add-card {
+            border: 1px dashed rgba(22, 37, 68, 0.18);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.85);
+            padding: 1rem;
+        }
+        @media (max-width: 991px) {
+            .management-split {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body class="app-page">
+
+<nav class="navbar navbar-dark site-navbar">
+    <div class="container">
+        <a class="navbar-brand d-flex align-items-center" href="{% url 'management' %}">
+            <span class="brand-mark"></span>
+            <span>Бадминтон зала Юнак</span>
+        </a>
+
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <a href="{% url 'admin:index' %}" class="btn btn-outline-light btn-sm">Админ панел</a>
+            <a href="{% url 'profile' %}" class="btn btn-outline-light btn-sm">Профил</a>
+            <form action="{% url 'logout' %}" method="post" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-light btn-sm">Изход</button>
+            </form>
+        </div>
+    </div>
+</nav>
+
+<div class="container page-shell management-shell">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <section class="management-hero">
+        <div class="section-kicker mb-2">Администрация</div>
+        <h1 class="hero-title mb-2">Управление на потребители, продукти и услуги</h1>
+    </section>
+
+    <form method="get" class="management-toolbar">
+        <div class="management-toolbar-group">
+            <label class="form-label small fw-semibold mb-1">Търсене в панела</label>
+            <input
+                type="text"
+                name="q"
+                value="{{ search_query }}"
+                class="form-control"
+                placeholder="Потребител, имейл, продукт или услуга"
+            >
+        </div>
+        <div class="management-toolbar-group" style="max-width: 240px;">
+            <label class="form-label small fw-semibold mb-1">Филтър по роля</label>
+            <select name="user_role" class="form-select">
+                <option value="">Всички роли</option>
+                {% for value, label in role_filter_choices %}
+                    <option value="{{ value }}" {% if user_role_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-brand">Търси</button>
+            <a href="{% url 'management' %}" class="btn btn-outline-dark">Изчисти</a>
+        </div>
+    </form>
+
+    <section class="management-grid mb-4">
+        <div class="management-stat">
+            <div class="management-stat-label">Потребители</div>
+            <div class="management-stat-value">{{ managed_users|length }}</div>
+        </div>
+        <div class="management-stat">
+            <div class="management-stat-label">Активни акаунти</div>
+            <div class="management-stat-value">{{ active_users_count }}</div>
+        </div>
+        <div class="management-stat">
+            <div class="management-stat-label">Продукти</div>
+            <div class="management-stat-value">{{ managed_products|length }}</div>
+        </div>
+        <div class="management-stat">
+            <div class="management-stat-label">Услуги</div>
+            <div class="management-stat-value">{{ managed_services|length }}</div>
+        </div>
+        <div class="management-stat">
+            <div class="management-stat-label">Ниски наличности</div>
+            <div class="management-stat-value">{{ low_stock_products_count }}</div>
+        </div>
+    </section>
+
+    <section class="management-section">
+        <div class="card app-card">
+            <div class="app-card-header">
+                <div class="section-kicker mb-1">Потребители</div>
+                <h3 class="app-card-title">Роли и достъп</h3>
+            </div>
+            <div class="card-body">
+                <div class="management-list">
+                    {% for row in managed_users %}
+                        <div class="management-item">
+                            <div class="management-item-head">
+                                <div>
+                                    <div class="management-item-title">{{ row.user.get_full_name|default:row.user.username }}</div>
+                                    <div class="management-item-subtitle">
+                                        {{ row.user.username }}
+                                        {% if row.user.email %} · {{ row.user.email }}{% endif %}
+                                    </div>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2 justify-content-end">
+                                    <span class="management-pill role">{{ row.user.get_role_display }}</span>
+                                    {% if row.user.is_active %}
+                                        <span class="management-pill" style="background: rgba(18, 183, 106, 0.12); color: #027a48;">Активен</span>
+                                    {% else %}
+                                        <span class="management-pill warn">Неактивен</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <form method="post" class="mb-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="update_user">
+                                <input type="hidden" name="user_id" value="{{ row.user.id }}">
+                                <input type="hidden" name="q" value="{{ search_query }}">
+                                <input type="hidden" name="user_role" value="{{ user_role_filter }}">
+                                <div class="management-form-grid">
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Име</label>
+                                        {{ row.form.first_name }}
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Фамилия</label>
+                                        {{ row.form.last_name }}
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Имейл</label>
+                                        {{ row.form.email }}
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Телефон</label>
+                                        {{ row.form.phone }}
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Роля</label>
+                                        {{ row.form.role }}
+                                    </div>
+                                    <div class="d-flex align-items-center pt-4">
+                                        <div class="form-check">
+                                            {{ row.form.is_active }}
+                                            <label class="form-check-label ms-2 small fw-semibold" for="{{ row.form.is_active.id_for_label }}">Активен профил</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="management-actions">
+                                    <button type="submit" class="btn btn-brand btn-sm">Запази потребителя</button>
+                                </div>
+                            </form>
+                        </div>
+                    {% empty %}
+                        <div class="text-muted">Няма потребители за управление.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="management-section management-split">
+        <div class="card app-card">
+            <div class="app-card-header">
+                <div class="section-kicker mb-1">Каталог</div>
+                <h3 class="app-card-title">Продукти</h3>
+            </div>
+            <div class="card-body">
+                <div class="management-list">
+                    {% for row in managed_products %}
+                        <div class="management-item">
+                            <div class="management-item-head">
+                                <div>
+                                    <div class="management-item-title">{{ row.product.name }}</div>
+                                    <div class="management-item-subtitle">{{ row.product.get_category_display }}</div>
+                                </div>
+                                <div class="management-head-actions">
+                                    {% if not row.product.is_active %}
+                                        <span class="management-pill muted">Архивиран</span>
+                                    {% endif %}
+                                    {% if row.product.quantity is not None and row.product.quantity <= 5 and row.product.is_active %}
+                                        <span class="management-pill warn">Ниска наличност</span>
+                                    {% endif %}
+                                    <form method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="toggle_product_active">
+                                        <input type="hidden" name="product_id" value="{{ row.product.id }}">
+                                        <input type="hidden" name="q" value="{{ search_query }}">
+                                        <input type="hidden" name="user_role" value="{{ user_role_filter }}">
+                                        <button type="submit" class="btn btn-sm {% if row.product.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}">
+                                            {% if row.product.is_active %}Архивирай{% else %}Възстанови{% endif %}
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            <form method="post" class="mb-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="update_product">
+                                <input type="hidden" name="product_id" value="{{ row.product.id }}">
+                                <input type="hidden" name="q" value="{{ search_query }}">
+                                <input type="hidden" name="user_role" value="{{ user_role_filter }}">
+                                <div class="management-form-grid">
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Име</label>
+                                        {{ row.form.name }}
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Описание</label>
+                                        {{ row.form.description }}
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Категория</label>
+                                        {{ row.form.category }}
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Цена</label>
+                                        {{ row.form.price }}
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Наличност</label>
+                                        {{ row.form.quantity }}
+                                    </div>
+                                </div>
+                                <div class="management-actions">
+                                    <button type="submit" class="btn btn-brand btn-sm">Запази продукта</button>
+                                </div>
+                            </form>
+                        </div>
+                    {% empty %}
+                        <div class="text-muted">Няма продукти по текущото търсене.</div>
+                    {% endfor %}
+
+                    <div class="management-add-card">
+                        <div class="management-item-title mb-3">Добави нов продукт</div>
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="add_product">
+                            <input type="hidden" name="q" value="{{ search_query }}">
+                            <input type="hidden" name="user_role" value="{{ user_role_filter }}">
+                            <div class="management-form-grid">
+                                <div>{{ new_product_form.name }}</div>
+                                <div>{{ new_product_form.description }}</div>
+                                <div>{{ new_product_form.category }}</div>
+                                <div>{{ new_product_form.price }}</div>
+                                <div>{{ new_product_form.quantity }}</div>
+                            </div>
+                            <div class="management-actions">
+                                <button type="submit" class="btn btn-outline-dark btn-sm">Добави продукт</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card app-card">
+            <div class="app-card-header">
+                <div class="section-kicker mb-1">Каталог</div>
+                <h3 class="app-card-title">Услуги</h3>
+            </div>
+            <div class="card-body">
+                <div class="management-list">
+                    {% for row in managed_services %}
+                        <div class="management-item">
+                            <div class="management-item-head">
+                                <div>
+                                    <div class="management-item-title">{{ row.service.name }}</div>
+                                    <div class="management-item-subtitle">{{ row.service.get_category_display }}</div>
+                                </div>
+                                <div class="management-head-actions">
+                                    {% if not row.service.is_active %}
+                                        <span class="management-pill muted">Архивирана</span>
+                                    {% endif %}
+                                    <form method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="toggle_service_active">
+                                        <input type="hidden" name="service_id" value="{{ row.service.id }}">
+                                        <input type="hidden" name="q" value="{{ search_query }}">
+                                        <input type="hidden" name="user_role" value="{{ user_role_filter }}">
+                                        <button type="submit" class="btn btn-sm {% if row.service.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}">
+                                            {% if row.service.is_active %}Архивирай{% else %}Възстанови{% endif %}
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            <form method="post" class="mb-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="update_service">
+                                <input type="hidden" name="service_id" value="{{ row.service.id }}">
+                                <input type="hidden" name="q" value="{{ search_query }}">
+                                <input type="hidden" name="user_role" value="{{ user_role_filter }}">
+                                <div class="management-form-grid">
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Име</label>
+                                        {{ row.form.name }}
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Описание</label>
+                                        {{ row.form.description }}
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Категория</label>
+                                        {{ row.form.category }}
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Цена</label>
+                                        {{ row.form.price }}
+                                    </div>
+                                    <div>
+                                        <label class="form-label small fw-semibold mb-1">Наличност</label>
+                                        {{ row.form.quantity }}
+                                    </div>
+                                </div>
+                                <div class="management-actions">
+                                    <button type="submit" class="btn btn-brand btn-sm">Запази услугата</button>
+                                </div>
+                            </form>
+                        </div>
+                    {% empty %}
+                        <div class="text-muted">Няма услуги по текущото търсене.</div>
+                    {% endfor %}
+
+                    <div class="management-add-card">
+                        <div class="management-item-title mb-3">Добави нова услуга</div>
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="add_service">
+                            <input type="hidden" name="q" value="{{ search_query }}">
+                            <input type="hidden" name="user_role" value="{{ user_role_filter }}">
+                            <div class="management-form-grid">
+                                <div>{{ new_service_form.name }}</div>
+                                <div>{{ new_service_form.description }}</div>
+                                <div>{{ new_service_form.category }}</div>
+                                <div>{{ new_service_form.price }}</div>
+                                <div>{{ new_service_form.quantity }}</div>
+                            </div>
+                            <div class="management-actions">
+                                <button type="submit" class="btn btn-outline-dark btn-sm">Добави услуга</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

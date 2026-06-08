@@ -26,10 +26,11 @@
             {% if user.role == 'customer' or user.role == 'trainer' %}
                 <a href="{% url 'schedule' %}" class="btn btn-brand btn-sm">Нов час</a>
             {% endif %}
-            {% if user.is_superuser or user.role == 'admin' or user.role == 'accounting' %}
+            {% if user.role == 'accounting' %}
                 <a href="{% url 'finance' %}" class="btn btn-brand btn-sm">Финанси</a>
             {% endif %}
             {% if user.is_superuser or user.role == 'admin' %}
+                <a href="{% url 'management' %}" class="btn btn-brand btn-sm">Управление</a>
                 <a href="{% url 'admin:index' %}" class="btn btn-outline-light btn-sm">Админ панел</a>
             {% endif %}
             

@@ -44,9 +44,16 @@
                 <div class="card-body">
                     <form method="POST" id="loginForm" novalidate>
                         {% csrf_token %}
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger" role="alert">
+                                {% for error in form.non_field_errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                         <div class="mb-3">
                             <label class="form-label">Потребителско име</label>
-                            <input type="text" name="username" class="form-control" required autofocus autocomplete="username">
+                            <input type="text" name="username" class="form-control" required autofocus autocomplete="username" value="{{ form.username.value|default:'' }}">
                             <div class="invalid-feedback">Моля, въведете потребителско име.</div>
                         </div>
                         <div class="mb-3">

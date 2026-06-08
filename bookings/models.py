@@ -2,7 +2,6 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.utils import timezone
 
-# 1. Потребител
 class User(AbstractUser):
     GENDER_CHOICES = (
         ('male', 'Мъж'),
@@ -38,7 +37,6 @@ class User(AbstractUser):
             return True
         return super().has_module_perms(app_label)
 
-# 2. Треньор
 class TrainerProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='trainer_profile')
     expertise_level = models.CharField(max_length=100, default="Професионален треньор")
@@ -49,7 +47,6 @@ class TrainerProfile(models.Model):
     def __str__(self):
         return f"Треньор: {self.user.get_full_name()}"
 
-# 3. Кортове
 class Court(models.Model):
     name = models.CharField(max_length=50, verbose_name="Име на корта")
     court_type = models.CharField(max_length=50, default="Стандартен", verbose_name="Настилка")
@@ -58,7 +55,6 @@ class Court(models.Model):
     def __str__(self):
         return self.name
 
-# 4. Продукти и Услуги
 CATEGORY_CHOICES = (
     ('drink', 'Напитка/Храна'),
     ('game', 'Игра'),
@@ -73,13 +69,13 @@ class Product(models.Model):
     description = models.CharField(max_length=200, blank=True, default='', verbose_name="Пояснение")
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='product', verbose_name="Категория")
     price = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="Цена")
-    quantity = models.IntegerField(default=0, blank=True, null=True, verbose_name="Наличност") 
+    quantity = models.IntegerField(default=0, blank=True, null=True, verbose_name="Наличност")
+    is_active = models.BooleanField(default=True, verbose_name="Активен")
     image = models.ImageField(upload_to='products/', blank=True, null=True)
 
     def __str__(self):
         return f"{self.name} ({self.quantity} бр.)"
 
-# 5. Резервации
 class Booking(models.Model):
     TRAINING_TYPE_CHOICES = (
         ('amateur', 'Любителска тренировка'),
@@ -123,7 +119,6 @@ class Booking(models.Model):
         local_start = timezone.localtime(self.start_time)
         return f"{self.court.name} - {local_start.strftime('%d.%m %H:%M')}"
 
-# 6. Продажби (История на покупките от рецепцията) - ТОВА ЛИПСВАШЕ
 class Sale(models.Model):
     PAYMENT_METHOD_CHOICES = (
         ('cash', 'В брой'),
@@ -209,3 +204,4 @@ class Expense(models.Model):
 
     def __str__(self):
         return f"{self.title} - {self.amount} €"
+

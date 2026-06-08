@@ -1,21 +1,20 @@
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
-from django.urls import path
 from django.contrib.auth import views as auth_views
-from bookings import views  # <-- Увери се, че импортираш views от приложението bookings
+from django.urls import path
+
+from bookings import views
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    
-    # --- ОСНОВНИ СТРАНИЦИ ---
     path('', views.home, name='home'),
     path('register/', views.register, name='register'),
     path('profile/', views.profile, name='profile'),
+    path('management/', views.management, name='management'),
     path('finance/', views.finance, name='finance'),
     path('finance/expenses/add/', views.add_expense, name='add_expense'),
-
-    # --- ВХОД И ИЗХОД ---
     path('login/', views.RoleAwareLoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(template_name='logout.html'), name='logout'),
     path(
@@ -50,8 +49,6 @@ urlpatterns = [
         ),
         name='password_reset_complete',
     ),
-
-    # --- ГРАФИК И РЕЗЕРВАЦИИ ---
     path('schedule/', views.schedule, name='schedule'),
     path('booking/login-required/', views.booking_login_required, name='booking_login_required'),
     path('booking/make/', views.make_booking, name='make_booking'),
@@ -59,8 +56,6 @@ urlpatterns = [
     path('booking/trainer-cancel/<int:booking_id>/', views.trainer_cancel_booking, name='trainer_cancel_booking'),
     path('booking/staff-cancel/<int:booking_id>/', views.staff_cancel_booking, name='staff_cancel_booking'),
     path('booking/pay/<int:booking_id>/', views.mark_paid, name='mark_paid'),
-
-    # --- РЕЦЕПЦИЯ (Това липсваше!) ---
     path('reception/', views.reception, name='reception'),
     path('reception/bill/add/<int:product_id>/', views.add_to_bill, name='add_to_bill'),
     path('reception/bill/decrease/<int:product_id>/', views.decrease_bill_item, name='decrease_bill_item'),
