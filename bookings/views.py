@@ -1060,8 +1060,8 @@ def profile(request):
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'update_profile':
-            if request.user.role != 'customer':
-                messages.error(request, 'Само клиентски профили могат да редактират тези данни.')
+            if request.user.role not in ['customer', 'trainer']:
+                messages.error(request, 'Само клиентски и треньорски профили могат да редактират тези данни.')
                 return redirect('profile')
 
             customer_edit_form = CustomerProfileEditForm(request.POST, instance=request.user)
@@ -1074,7 +1074,7 @@ def profile(request):
 
         elif action == 'update_photo':
             photo_form = ProfilePhotoForm(request.POST, request.FILES, instance=request.user)
-            if request.user.role == 'customer':
+            if request.user.role in ['customer', 'trainer']:
                 customer_edit_form = CustomerProfileEditForm(instance=request.user)
             if photo_form.is_valid():
                 photo_form.save()
@@ -1101,7 +1101,7 @@ def profile(request):
             .order_by('-start_time')
         )
 
-    if customer_edit_form is None and request.user.role == 'customer':
+    if customer_edit_form is None and request.user.role in ['customer', 'trainer']:
         customer_edit_form = CustomerProfileEditForm(instance=request.user)
     if photo_form is None:
         photo_form = ProfilePhotoForm(instance=request.user)

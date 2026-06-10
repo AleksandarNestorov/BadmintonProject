@@ -60,7 +60,7 @@
                         <div class="section-kicker mb-1">Профил</div>
                         <h5 class="app-card-title">Моят профил</h5>
                     </div>
-                    {% if user.role == 'customer' %}
+                    {% if user.role == 'customer' or user.role == 'trainer' %}
                         <button type="button" class="btn btn-brand btn-sm" data-bs-toggle="collapse" data-bs-target="#editProfileCollapse" aria-expanded="{% if customer_edit_form.errors %}true{% else %}false{% endif %}">
                             Редактиране
                         </button>
@@ -124,7 +124,7 @@
                     <p class="mb-0"><strong>Роля:</strong> {{ user.get_role_display }}</p>
                 </div>
 
-                {% if user.role == 'customer' %}
+                {% if user.role == 'customer' or user.role == 'trainer' %}
                     <div id="editProfileCollapse" class="collapse {% if customer_edit_form.errors %}show{% endif %}">
                         <div class="card-body border-top">
                             <form method="post" novalidate>
